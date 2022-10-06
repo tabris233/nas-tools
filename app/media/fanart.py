@@ -22,6 +22,9 @@ class Fanart:
                        'seasonthumb',
                        'tvposter',
                        'hdclearart']
+    _prefer_image_lang = ['cn',
+                          'ja',
+                          'en']
     _images = {}
 
     def __init__(self):
@@ -41,6 +44,7 @@ class Fanart:
                     for image_type in self._movie_image_types:
                         images = ret.json().get(image_type)
                         if isinstance(images, list):
+                            images = self.__images_sort_by_language(images)
                             self._images[image_type] = images[0].get('url') if isinstance(images[0], dict) else ""
                         else:
                             self._images[image_type] = ""
@@ -48,6 +52,7 @@ class Fanart:
                     for image_type in self._tv_image_types:
                         images = ret.json().get(image_type)
                         if isinstance(images, list):
+                            images = self.__images_sort_by_language(images)
                             if image_type in ['seasonposter', 'seasonthumb', 'seasonbanner']:
                                 if not self._images.get(image_type):
                                     self._images[image_type] = {}
@@ -60,6 +65,29 @@ class Fanart:
                             self._images[image_type] = ""
         except Exception as e2:
             print(str(e2))
+
+    def __images_sort_by_language(self, images):
+        """
+        对获得的图片列表排序，将更喜欢的语言放在前面
+        """
+        new_images = []
+        for lang in self._prefer_image_lang:
+            for image in images:
+                if not isinstance(image, dict):
+                    continue
+                if image.get("lang") == lang:
+                    new_images.append(image)
+
+        for image in images:
+            if not isinstance(image, dict):
+                continue
+            if image.get("lang") not in self._prefer_image_lang:
+                new_images.append(image)
+
+        print('images', images)
+        print('new_images', new_images)
+
+        return new_images
 
     @classmethod
     @lru_cache(maxsize=256)
