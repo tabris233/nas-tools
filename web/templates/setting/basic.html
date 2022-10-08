@@ -174,6 +174,18 @@
             <div class="row">
               <div class="col-lg">
                 <div class="mb-3">
+                  <label class="form-label">转移文件夹黑名单 <span class="form-help" title="文件所在上级文件夹名称在黑名单中的，忽略转移" data-bs-toggle="tooltip">?</span></label>
+                  <input type="text" value="{{ Config.media.ignored_paths or '' }}" class="form-control" id="media.ignored_paths" placeholder="使用;分隔" autocomplete="off">
+                </div>
+              </div>
+              <div class="col-lg">
+                <div class="mb-3">
+                  <label class="form-label">文件转移忽略词 <span class="form-help" title="文件名（包括扩展名）包含忽略词的，忽略转移，支持正则表达式，注意特殊字符转义" data-bs-toggle="tooltip">?</span></label>
+                  <input type="text" value="{{ Config.media.ignored_files or '' }}" class="form-control" id="media.ignored_files" placeholder="支持正则表达式，使用;分隔" autocomplete="off">
+                </div>
+              </div>
+              <div class="col-lg">
+                <div class="mb-3">
                   <label class="form-label required">下载优先规则 <span class="form-help" title="订阅及远程搜索下载将按此优先规则选择下载资源，其中站点优先决定于维护的站点优先级或索引器中配置的站点顺序，默认为站点优先" data-bs-toggle="tooltip">?</span></label>
                   <select class="form-select" id="pt.download_order">
                     <option value="" {% if not Config.pt.download_order %}selected{% endif %}>默认</option>
@@ -409,6 +421,14 @@
                   <label class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="laboratory.search_en_title" {% if Config.laboratory and Config.laboratory.search_en_title %}checked{% endif %}>
                     <span class="form-check-label">搜索优先使用英文名 <span class="form-help" title="开启后对于精确搜索场景将会优先使用英文名搜索，否则优先使用中文名搜索" data-bs-toggle="tooltip">?</span></span>
+                  </label>
+                </div>
+              </div>
+              <div class="col-12 col-xl-3">
+                <div class="mb-3">
+                  <label class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="laboratory.chrome_browser" {% if Config.laboratory and Config.laboratory.chrome_browser %}checked{% endif %}>
+                    <span class="form-check-label">开启浏览器仿真 <span class="form-help" title="开启后站点签到、数据统计可以兼容更多站点，但获取数据耗时会大幅增加；需要拉取含浏览器内核的镜像才能使用" data-bs-toggle="tooltip">?</span></span>
                   </label>
                 </div>
               </div>
@@ -761,7 +781,7 @@
             <div class="col-lg-12">
               <div class="mb-3">
                 <label class="form-label">集数偏移 <span class="form-help" title="识别时会通过前后定位词偏移集数，支持正则表达式" data-bs-toggle="tooltip">?</span></label>
-                <textarea class="form-control" id="offset_words" rows="4" placeholder="A@B@1，A为前定位词，B为后定位词，1为集数偏移（负数为向前偏移）&#13;&#10;使前后定位词间所包含数字为集数信息即可&#13;&#10;增加集数偏移请换行&#13;&#10;支持正则表达式，注意特殊字符转义">{{ Offset_Words or '' }}</textarea>
+                <textarea class="form-control" id="offset_words" rows="4" placeholder="A@B@1，A为前定位词，B为后定位词，1为集数偏移量（负数为向前偏移）&#13;&#10;应使前后定位词之间的字符串里包含的数字为集数&#13;&#10;增加集数偏移请换行&#13;&#10;支持正则表达式，注意特殊字符转义">{{ Offset_Words or '' }}</textarea>
               </div>
             </div>
           </div>
