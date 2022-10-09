@@ -108,7 +108,8 @@ SITE_CHECKIN_XPATH = [
     '//a[@id="signed"]',
     '//a[contains(@href, "attendance.php")]',
     '//a[contains(@text, "签到")]',
-    '//span[@id="sign_in"]/a'
+    '//span[@id="sign_in"]/a',
+    '//a[contains(@href, "addbonus")]'
 ]
 
 # 线程锁
@@ -177,7 +178,7 @@ class Config(object):
                                 'ipv6': '::/0'
                             },
                             'telegram_webhook_allow_ip': {
-                                'ipv4': '149.154.160.0/20,91.108.4.0/22',
+                                'ipv4': '127.0.0.1',
                                 'ipv6': '::/0'
                             }
                         }
