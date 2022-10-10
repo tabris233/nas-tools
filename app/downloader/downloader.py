@@ -125,7 +125,7 @@ class Downloader:
                                                  xpath=_xpath,
                                                  cookie=cookie)
                 if not url:
-                    return None, "无法从详情页面解析出下载链接"
+                    return None, "无法从详情页面：%s 解析出下载链接" % page_url
                 if _hash:
                     url = Torrent.convert_hash_to_magnet(hash_text=url, title=title)
                     if not url:
@@ -728,3 +728,9 @@ class Downloader:
                     continue
                 return {"path": path, "label": attr.get('label')}
         return {"path": None, "label": None}
+
+    def get_type(self):
+        """
+        返回下载器类型
+        """
+        return self.__client_type
