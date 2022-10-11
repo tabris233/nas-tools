@@ -22,7 +22,7 @@ class Fanart:
                        'seasonthumb',
                        'tvposter',
                        'hdclearart']
-    _prefer_image_lang = ['cn',
+    _prefer_image_lang = ['zh',
                           'ja',
                           'en']
     _images = {}
