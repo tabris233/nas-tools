@@ -406,8 +406,9 @@ class BrushTask(object):
         # 判断大小
         total_size = SqlHelper.get_brushtask_totalsize(taskid)
         if seedsize:
-            if int(seedsize) * 1024 ** 3 <= int(total_size):
-                log_warn("【BRUSH】刷流任务 %s 已达到保种体积 %sGB，不再新增下载" % (taskname, seedsize))
+            if float(seedsize) * 1024 ** 3 <= int(total_size):
+                log_warn("【BRUSH】刷流任务 %s 当前保种体积 %sGB，不再新增下载"
+                         % (taskname, round(int(total_size)/1024/1024/1024, 1)))
                 return False
         # 检查正在下载的任务数
         if dlcount:
@@ -415,7 +416,7 @@ class BrushTask(object):
             if downloading_count is None:
                 log_error("【BRUSH】任务 %s 下载器 %s 无法连接" % (taskname, downloadercfg.get("name")))
                 return False
-            if int(downloading_count) > int(dlcount):
+            if int(downloading_count) >= int(dlcount):
                 log_warn("【BRUSH】下载器 %s 正在下载任务数：%s，超过设定上限，暂不添加下载" % (downloadercfg.get("name"), downloading_count))
                 return False
         return True
@@ -426,7 +427,7 @@ class BrushTask(object):
         获取下载器的参数
         """
         if not dlid:
-            return None
+            return {}
         downloader_info = SqlHelper.get_user_downloaders(dlid)
         if downloader_info:
             userconfig = {"id": downloader_info[0][0],
@@ -438,7 +439,7 @@ class BrushTask(object):
                           "password": downloader_info[0][6],
                           "save_dir": downloader_info[0][7]}
             return userconfig
-        return None
+        return {}
 
     def __get_downloading_count(self, downloadercfg):
         """
@@ -508,7 +509,6 @@ class BrushTask(object):
                 tag = torrent_tag
             ret = downloader.add_torrent(content=enclosure,
                                          tag=tag,
-                                         is_paused=True,
                                          download_dir=downloadercfg.get("save_dir"),
                                          upload_limit=upspeed,
                                          download_limit=downspeed)

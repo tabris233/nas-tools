@@ -3,15 +3,17 @@ import os
 import qbittorrentapi
 
 import log
+from app.utils.types import DownloaderType
 from config import Config, PT_TAG
 from app.downloader.client.client import IDownloadClient
 from pkg_resources import parse_version as v
 
 
 class Qbittorrent(IDownloadClient):
-    __force_upload = False
+    _force_upload = False
     qbc = None
     ver = None
+    client_type = DownloaderType.QB
 
     def get_config(self):
         # 读取配置文件
@@ -23,7 +25,7 @@ class Qbittorrent(IDownloadClient):
             self.username = qbittorrent.get('qbusername')
             self.password = qbittorrent.get('qbpassword')
             # 强制做种开关
-            self.__force_upload = qbittorrent.get('force_upload')
+            self._force_upload = qbittorrent.get('force_upload')
 
     def connect(self):
         if self.host and self.port:
@@ -41,7 +43,7 @@ class Qbittorrent(IDownloadClient):
                                         username=self.username,
                                         password=self.password,
                                         VERIFY_WEBUI_CERTIFICATE=False,
-                                        REQUESTS_ARGS={'timeout': (3, 10)})
+                                        REQUESTS_ARGS={'timeout': (5, 15)})
             try:
                 qbt.auth_log_in()
                 self.ver = qbt.app_version()
@@ -49,7 +51,7 @@ class Qbittorrent(IDownloadClient):
                 print(e)
             return qbt
         except Exception as err:
-            log.error("【QB】qBittorrent连接出错：%s" % str(err))
+            log.error(f"【{self.client_type}】qBittorrent连接出错：{str(err)}")
             return None
 
     def get_status(self):
@@ -104,9 +106,9 @@ class Qbittorrent(IDownloadClient):
             # 打标签
             self.qbc.torrents_add_tags(tags="已整理", torrent_hashes=ids)
             # 超级做种
-            if self.__force_upload:
+            if self._force_upload:
                 self.qbc.torrents_set_force_start(enable=True, torrent_hashes=ids)
-            log.info("【QB】设置qBittorrent种子状态成功")
+            log.info(f"【{self.client_type}】设置qBittorrent种子状态成功")
         except Exception as err:
             print(str(err))
 
@@ -143,7 +145,7 @@ class Qbittorrent(IDownloadClient):
             if not torrent.get('seeding_time'):
                 continue
             if int(torrent.get('seeding_time')) > int(seeding_time):
-                log.info("【QB】%s 做种时间：%s（秒），已达清理条件，进行清理..." % (torrent.get('name'), torrent.get('seeding_time')))
+                log.info(f"【{self.client_type}】{torrent.get('name')} 做种时间：{torrent.get('seeding_time')}（秒），已达清理条件，进行清理...")
                 remove_torrents.append(torrent.get('hash'))
         return remove_torrents
 
@@ -152,8 +154,6 @@ class Qbittorrent(IDownloadClient):
         根据种子的下载链接获取下载中或暂停的钟子的ID
         :return: 种子ID
         """
-        if not status:
-            status = ["paused"]
         try:
             torrents = self.get_torrents(status=status, tag=tag)
         except Exception as err:
@@ -184,8 +184,8 @@ class Qbittorrent(IDownloadClient):
         :param download_dir: 下载路径
         :param category: 分类
         :param content_layout: 布局
-        :param upload_limit: 上传限速 Mb/s
-        :param download_limit: 下载限速 Mb/s
+        :param upload_limit: 上传限速 Kb/s
+        :param download_limit: 下载限速 Kb/s
         :param ratio_limit: 分享率限制
         :param seeding_time_limit: 做种时间限制
         :return: bool

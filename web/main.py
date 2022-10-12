@@ -249,7 +249,7 @@ def create_flask_app():
         SongCount = 0
         MediaServerClient = MediaServer()
         media_count = MediaServerClient.get_medias_count()
-        MSType = MediaServerClient.get_type()
+        MSType = Config().get_config('media').get('media_server')
         if media_count:
             MovieCount = "{:,}".format(media_count.get('MovieCount'))
             SeriesCount = "{:,}".format(media_count.get('SeriesCount'))
@@ -836,7 +836,7 @@ def create_flask_app():
         # 下载器列表
         downloaders = SqlHelper.get_user_downloaders() or []
         # 任务列表
-        brushtasks = SqlHelper.get_brushtasks()
+        brushtasks = SqlHelper.get_brushtasks() or []
         Tasks = []
         for task in brushtasks:
             sendmessage_switch = DictHelper.get(SystemDictType.BrushMessageSwitch.value, task[2])
