@@ -14,13 +14,12 @@ from app.message import Message
 from app.searcher import Searcher
 from app.utils.types import SearchType, MediaType
 from config import Config
-from web.backend.subscribe import add_rss_subscribe
+from app.subscribe import Subscribe
 
 lock = Lock()
 
 
 class DoubanSync:
-    
     douban = None
     searcher = None
     media = None
@@ -31,7 +30,7 @@ class DoubanSync:
     __users = None
     __days = None
     __types = None
-    
+
     def __init__(self):
         self.douban = DouBan()
         self.searcher = Searcher()
@@ -39,7 +38,7 @@ class DoubanSync:
         self.media = Media()
         self.message = Message()
         self.init_config()
-        
+
     def init_config(self):
         config = Config()
         douban = config.get_config('douban')
@@ -60,7 +59,7 @@ class DoubanSync:
             types = douban.get('types')
             if types:
                 self.__types = types.split(',')
-    
+
     def sync(self):
         """
         同步豆瓣数据
@@ -82,28 +81,28 @@ class DoubanSync:
                     # 查询数据库状态，已经加入RSS的不处理
                     search_state = SqlHelper.get_douban_search_state(media.get_name(), media.year)
                     if not search_state or search_state[0][0] == "NEW":
+                        if media.begin_season:
+                            subtitle = "第%s季" % media.begin_season
+                        else:
+                            subtitle = None
+                        media_info = self.media.get_media_info(title="%s %s" % (media.get_name(), media.year or ""),
+                                                               subtitle=subtitle,
+                                                               mtype=media.type)
+                        # 不需要自动加订阅，则直接搜索
+                        if not media_info or not media_info.tmdb_info:
+                            log.warn("【Douban】%s 未查询到媒体信息" % media.get_name())
+                            continue
+                        # 检查是否存在，电视剧返回不存在的集清单
+                        exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
+                        # 已经存在
+                        if exist_flag:
+                            # 更新为已下载状态
+                            log.info("【Douban】%s 已存在" % media.get_name())
+                            SqlHelper.insert_douban_media_state(media, "DOWNLOADED")
+                            continue
                         if not self.__auto_rss:
-                            # 不需要自动加订阅，则直接搜索
-                            if media.begin_season:
-                                subtitle = "第%s季" % media.begin_season
-                            else:
-                                subtitle = None
-                            media_info = self.media.get_media_info(title="%s %s" % (media.get_name(), media.year or ""),
-                                                                   subtitle=subtitle,
-                                                                   mtype=media.type)
-                            if not media_info or not media_info.tmdb_info:
-                                log.warn("【Douban】%s 未查询到媒体信息" % media.get_name())
-                                continue
                             # 合并季
                             media_info.begin_season = media.begin_season
-                            # 检查是否存在，电视剧返回不存在的集清单
-                            exist_flag, no_exists, _ = self.downloader.check_exists_medias(meta_info=media_info)
-                            # 已经存在
-                            if exist_flag:
-                                # 更新为已下载状态
-                                log.info("【Douban】%s 已存在" % media.get_name())
-                                SqlHelper.insert_douban_media_state(media, "DOWNLOADED")
-                                continue
                             # 开始检索
                             search_result, no_exists, search_count, download_count = self.searcher.search_one_media(
                                 media_info=media_info,
@@ -115,11 +114,11 @@ class DoubanSync:
                         else:
                             # 需要加订阅，则由订阅去检索
                             log.info("【Douban】%s %s 更新到%s订阅中..." % (media.get_name(), media.year, media.type.value))
-                            code, msg, _ = add_rss_subscribe(mtype=media.type,
-                                                             name=media.get_name(),
-                                                             year=media.year,
-                                                             season=media.begin_season,
-                                                             doubanid=media.douban_id)
+                            code, msg, _ = Subscribe.add_rss_subscribe(mtype=media.type,
+                                                                       name=media.get_name(),
+                                                                       year=media.year,
+                                                                       season=media.begin_season,
+                                                                       doubanid=media.douban_id)
                             if code != 0:
                                 log.error("【Douban】%s 添加订阅失败：%s" % (media.get_name(), msg))
                             else:
@@ -135,12 +134,12 @@ class DoubanSync:
                     # 加入订阅，使状态为R
                     for media in medias:
                         log.info("【Douban】%s %s 更新到%s订阅中..." % (media.get_name(), media.year, media.type.value))
-                        code, msg, _ = add_rss_subscribe(mtype=media.type,
-                                                         name=media.get_name(),
-                                                         year=media.year,
-                                                         season=media.begin_season,
-                                                         doubanid=media.douban_id,
-                                                         state="R")
+                        code, msg, _ = Subscribe.add_rss_subscribe(mtype=media.type,
+                                                                   name=media.get_name(),
+                                                                   year=media.year,
+                                                                   season=media.begin_season,
+                                                                   doubanid=media.douban_id,
+                                                                   state="R")
                         if code != 0:
                             log.error("【Douban】%s 添加订阅失败：%s" % (media.get_name(), msg))
                         else:
@@ -151,7 +150,7 @@ class DoubanSync:
             log.info("【Douban】豆瓣数据同步完成")
         finally:
             lock.release()
-            
+
     def __get_all_douban_movies(self):
         """
         获取每一个用户的每一个类型的豆瓣标记
