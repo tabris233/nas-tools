@@ -101,8 +101,12 @@ class Transmission(IDownloadClient):
         """
         if not self.trc:
             return []
-        torrents, _ = self.get_torrents(status=["downloading", "download_pending", "stopped"], tag=tag)
-        return torrents
+        try:
+            torrents, _ = self.get_torrents(status=["downloading", "download_pending", "stopped"], tag=tag)
+            return torrents
+        except Exception as err:
+            print(str(err))
+            return []
 
     def set_torrents_status(self, ids):
         if not self.trc:
@@ -207,7 +211,7 @@ class Transmission(IDownloadClient):
             if not path:
                 continue
             true_path = self.get_replace_path(path)
-            trans_tasks.append({'path': os.path.join(true_path, torrent.name), 'id': torrent.id})
+            trans_tasks.append({'path': os.path.join(true_path, torrent.name).replace("\\", "/"), 'id': torrent.id})
         return trans_tasks
 
     def get_remove_torrents(self, seeding_time, tag):
