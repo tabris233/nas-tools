@@ -300,7 +300,7 @@ class MetaBase(object):
             return self.resource_pix
         else:
             return ""
-    
+
     # 返回发布组/字幕组字符串
     def get_resource_team_string(self):
         if self.resource_team:
@@ -318,39 +318,45 @@ class MetaBase(object):
 
     # 返回背景图片地址
     def get_backdrop_image(self, default=True, original=False):
-        if self.fanart_backdrop:
-            return self.fanart_backdrop
-        else:
-            self.fanart_backdrop = self.fanart.get_backdrop(media_type=self.type,
-                                                            queryid=self.tmdb_id if self.type == MediaType.MOVIE else self.tvdb_id)
-        if self.fanart_backdrop:
-            return self.fanart_backdrop
-        elif self.backdrop_path:
+        if self.backdrop_path:
             if original:
                 return self.backdrop_path.replace("/w500", "/original")
             else:
                 return self.backdrop_path
-        else:
-            return "../static/img/tmdb.webp" if default else ""
-
-    # 返回消息图片地址
-    def get_message_image(self):
-        if self.fanart_backdrop:
+        elif self.fanart_backdrop:
             return self.fanart_backdrop
         else:
             self.fanart_backdrop = self.fanart.get_backdrop(media_type=self.type,
                                                             queryid=self.tmdb_id if self.type == MediaType.MOVIE else self.tvdb_id)
         if self.fanart_backdrop:
             return self.fanart_backdrop
-        elif self.backdrop_path:
+
+        return "../static/img/tmdb.webp" if default else ""
+
+    # 返回消息图片地址
+    def get_message_image(self):
+        if self.backdrop_path:
             return self.backdrop_path
         elif self.poster_path:
             return self.poster_path
+        elif self.fanart_backdrop:
+            return self.fanart_backdrop
         else:
-            return DEFAULT_TMDB_IMAGE
+            self.fanart_backdrop = self.fanart.get_backdrop(media_type=self.type,
+                                                            queryid=self.tmdb_id if self.type == MediaType.MOVIE else self.tvdb_id)
+        if self.fanart_backdrop:
+            return self.fanart_backdrop
+
+        return DEFAULT_TMDB_IMAGE
 
     # 返回海报图片地址
     def get_poster_image(self, original=False):
+        if self.poster_path:
+            if original:
+                return self.poster_path.replace("/w500", "/original")
+            else:
+                return self.poster_path
+
         if self.fanart_poster:
             return self.fanart_poster
         else:
@@ -358,13 +364,8 @@ class MetaBase(object):
                                                         queryid=self.tmdb_id if self.type == MediaType.MOVIE else self.tvdb_id)
         if self.fanart_poster:
             return self.fanart_poster
-        elif self.poster_path:
-            if original:
-                return self.poster_path.replace("/w500", "/original")
-            else:
-                return self.poster_path
-        else:
-            return ""
+
+        return ""
 
     # 返回促销信息
     def get_volume_factor_string(self):
