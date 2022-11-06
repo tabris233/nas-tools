@@ -71,7 +71,12 @@ class Torrent:
         if url.startswith("magnet:"):
             return url, "磁力链接"
         try:
-            req = RequestUtils(headers=ua, cookies=cookie, referer=referer).get_res(url=url)
+            req = RequestUtils(headers=ua, cookies=cookie, referer=referer).get_res(url=url, allow_redirects=False)
+            while req and req.status_code in [301, 302]:
+                url = req.headers['Location']
+                if url and url.startswith("magnet:"):
+                    return url, "磁力链接"
+                req = RequestUtils(headers=ua, cookies=cookie, referer=referer).get_res(url=url, allow_redirects=False)
             if req and req.status_code == 200:
                 if not req.content:
                     return None, "未下载到种子数据"
@@ -94,17 +99,26 @@ class Torrent:
         if not os.path.exists(path):
             os.makedirs(path)
         # 下载种子
-        ret = RequestUtils(cookies=cookie, headers=ua, referer=referer).get_res(url)
-        if ret and ret.status_code == 200:
-            file_name = re.findall(r"filename=\"(.+)\"", ret.headers.get('content-disposition'))[0]
-            file_path = os.path.join(path, file_name)
-            with open(file_path, 'wb') as f:
-                f.write(ret.content)
-        elif not ret:
+        try:
+            ret = RequestUtils(cookies=cookie, headers=ua, referer=referer).get_res(url)
+            if ret and ret.status_code == 200:
+                file_name = re.findall(r"filename=\"?(.+)\"?", ret.headers.get('content-disposition'))
+                if not file_name:
+                    return None
+                file_name = file_name[0]
+                if file_name.endswith('"'):
+                    file_name = file_name[:-1]
+                file_path = os.path.join(path, file_name)
+                with open(file_path, 'wb') as f:
+                    f.write(ret.content)
+            elif not ret:
+                return None
+            else:
+                return None
+            return file_path
+        except Exception as err:
+            print(str(err))
             return None
-        else:
-            return None
-        return file_path
 
     @staticmethod
     def check_torrent_filter(meta_info, filter_args, uploadvolumefactor=None, downloadvolumefactor=None):

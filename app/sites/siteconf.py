@@ -361,6 +361,24 @@ class SiteConf:
             'HR': [],
             'PEER_COUNT': [],
         },
+        'zmpt.cc': {
+            'FREE': ["//font[@class='free']"],
+            '2XFREE': ["//font[@class='twoupfree']"],
+            'HR': [],
+            'PEER_COUNT': [],
+        },
+        'ihdbits.me': {
+            'FREE': ["//font[@class='free']"],
+            '2XFREE': ["//font[@class='twoupfree']"],
+            'HR': [],
+            'PEER_COUNT': [],
+        },
+        'leaves.red': {
+            'FREE': ["//font[@class='free']"],
+            '2XFREE': ["//font[@class='twoupfree']"],
+            'HR': [],
+            'PEER_COUNT': [],
+        }
     }
     # 公共BT站点
     PUBLIC_TORRENT_SITES = {
@@ -407,7 +425,8 @@ class SiteConf:
             "proxy": False
         },
         'www.mp4ba.vip': {
-            "proxy": False
+            "proxy": False,
+            "referer": True
         },
         'www.miobt.com': {
             "proxy": True
@@ -418,5 +437,8 @@ class SiteConf:
         },
         'btsow.quest': {
             "proxy": True
+        },
+        'www.hdpianyuan.com': {
+            "proxy": False
         }
     }
