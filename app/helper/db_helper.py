@@ -208,8 +208,8 @@ class DbHelper:
         timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
         self._db.insert(
             TRANSFERHISTORY(
-                SOURCE=in_from.value,
-                MODE=rmt_mode.value,
+                SOURCE=str(in_from.value),
+                MODE=str(rmt_mode.value),
                 TYPE=media_info.type.value,
                 FILE_PATH=file_path,
                 FILE_NAME=file_name,
@@ -545,11 +545,11 @@ class DbHelper:
         新增RSS电影
         """
         if not media_info:
-            return
+            return -1
         if not media_info.title:
-            return
+            return -1
         if self.is_exists_rss_movie(media_info.title, media_info.year):
-            return
+            return 9
         desc = "#".join(["|".join(sites or []),
                          "|".join(search_sites or []),
                          "Y" if over_edition else "N",
@@ -565,6 +565,7 @@ class DbHelper:
             DESC=desc,
             STATE=state
         ))
+        return 0
 
     @DbPersist(_db)
     def delete_rss_movie(self, title=None, year=None, rssid=None, tmdbid=None):
@@ -705,15 +706,15 @@ class DbHelper:
         新增RSS电视剧
         """
         if not media_info:
-            return
+            return -1
         if not media_info.title:
-            return
+            return -1
         if match and media_info.begin_season is None:
             season_str = ""
         else:
             season_str = media_info.get_season_string()
         if self.is_exists_rss_tv(media_info.title, media_info.year, season_str):
-            return
+            return 9
         # 插入订阅数据
         desc = "#".join(["|".join(sites or []),
                          "|".join(search_sites or []),
@@ -735,6 +736,7 @@ class DbHelper:
             LACK=lack,
             STATE=state
         ))
+        return 0
 
     @DbPersist(_db)
     def update_rss_tv_lack(self, title=None, year=None, season=None, rssid=None, lack_episodes: list = None):
@@ -878,7 +880,7 @@ class DbHelper:
             self._db.insert(SYNCHISTORY(
                 PATH=os.path.normpath(path),
                 SRC=os.path.normpath(src),
-                dest=os.path.normpath(dest)
+                DEST=os.path.normpath(dest)
             ))
 
     def get_users(self, ):
@@ -1338,10 +1340,10 @@ class DbHelper:
                 INTEVAL=item.get('interval'),
                 DOWNLOADER=item.get('downloader'),
                 TRANSFER=item.get('transfer'),
-                DOWNLOAD_COUNT=0,
-                REMOVE_COUNT=0,
-                DOWNLOAD_SIZE=0,
-                UPLOAD_SIZE=0,
+                DOWNLOAD_COUNT='0',
+                REMOVE_COUNT='0',
+                DOWNLOAD_SIZE='0',
+                UPLOAD_SIZE='0',
                 STATE=item.get('state'),
                 LST_MOD_DATE=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
             ))
@@ -2019,10 +2021,10 @@ class DbHelper:
                     "TAGS": tags,
                     "CONTENT_LAYOUT": int(content_layout),
                     "IS_PAUSED": int(is_paused),
-                    "UPLOAD_LIMIT": int(upload_limit),
-                    "DOWNLOAD_LIMIT": int(download_limit),
-                    "RATIO_LIMIT": int(ratio_limit),
-                    "SEEDING_TIME_LIMIT": int(seeding_time_limit),
+                    "UPLOAD_LIMIT": int(float(upload_limit)),
+                    "DOWNLOAD_LIMIT": int(float(download_limit)),
+                    "RATIO_LIMIT": int(round(float(ratio_limit), 2) * 100),
+                    "SEEDING_TIME_LIMIT": int(float(seeding_time_limit)),
                     "NOTE": note
                 }
             )
@@ -2033,9 +2035,9 @@ class DbHelper:
                 TAGS=tags,
                 CONTENT_LAYOUT=int(content_layout),
                 IS_PAUSED=int(is_paused),
-                UPLOAD_LIMIT=int(upload_limit),
-                DOWNLOAD_LIMIT=int(download_limit),
-                RATIO_LIMIT=int(ratio_limit),
-                SEEDING_TIME_LIMIT=int(seeding_time_limit),
+                UPLOAD_LIMIT=int(float(upload_limit)),
+                DOWNLOAD_LIMIT=int(float(download_limit)),
+                RATIO_LIMIT=int(round(float(ratio_limit), 2) * 100),
+                SEEDING_TIME_LIMIT=int(float(seeding_time_limit)),
                 NOTE=note
             ))
