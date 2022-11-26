@@ -7,7 +7,7 @@ import log
 from app.downloader.downloader import Downloader
 from app.filter import Filter
 from app.helper import DbHelper
-from app.media import Media
+from app.media import Media, MetaInfo
 from app.sites import Sites
 from app.subscribe import Subscribe
 from app.utils import DomUtils, RequestUtils, StringUtils
@@ -142,12 +142,12 @@ class Rss:
                             continue
                         # 识别种子名称，开始检索TMDB
                         media_info = self.media.get_media_info(title=title, subtitle=description)
-                        if not media_info:
-                            log.warn(f"【Rss】{title} 识别媒体信息出错！")
-                            continue
-                        elif not media_info.tmdb_info:
-                            log.info(f"【Rss】{title} 识别为 {media_info.get_name()} 未匹配到媒体信息")
-                            continue
+                        if media_info is not None:
+                            if not media_info.tmdb_info:
+                                log.info(f"【Rss】{title} 识别为 {media_info.get_name()} 未匹配到TMDB媒体信息")
+                        else:
+                            log.warn(f"【Rss】{title} 无法识别出媒体信息！")
+                            media_info = MetaInfo(title=title, subtitle=description)
                         # 大小及种子页面
                         media_info.set_torrent_info(size=size,
                                                     page_url=page_url,
@@ -245,8 +245,8 @@ class Rss:
                                                     upload_volume_factor=match_info.get("upload_volume_factor"),
                                                     rssid=match_info.get("id"),
                                                     description=description)
-                        media_info.save_path = match_info.get("save_path")
-                        media_info.download_setting = match_info.get("download_setting")
+                        media_info.set_download_info(download_setting=match_info.get("download_setting"),
+                                                     save_path=match_info.get("save_path"))
                         # 插入数据库
                         self.dbhelper.insert_rss_torrents(media_info)
                         # 加入下载列表

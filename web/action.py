@@ -33,7 +33,9 @@ from app.rss import Rss
 from app.rsschecker import RssChecker
 from app.scheduler import Scheduler
 from app.scheduler import restart_scheduler, stop_scheduler
+from app.searcher import Searcher
 from app.sites import Sites
+from app.sites.sitecookie import SiteCookie
 from app.subscribe import Subscribe
 from app.subtitle import Subtitle
 from app.sync import Sync
@@ -41,17 +43,15 @@ from app.sync import stop_monitor
 from app.utils import StringUtils, EpisodeFormat, RequestUtils, PathUtils, SystemUtils
 from app.utils.types import RMT_MODES, RmtMode, OsType
 from app.utils.types import SearchType, DownloaderType, SyncType, MediaType, SystemDictType
-from config import RMT_MEDIAEXT, Config, TMDB_IMAGE_W500_URL, TMDB_IMAGE_ORIGINAL_URL, RMT_SUBEXT
+from config import RMT_MEDIAEXT, TMDB_IMAGE_W500_URL, TMDB_IMAGE_ORIGINAL_URL, RMT_SUBEXT, CONFIG
 from web.backend.search_torrents import search_medias_for_web, search_media_by_message
 
 
 class WebAction:
-    config = None
     dbhelper = None
     _actions = {}
 
     def __init__(self):
-        self.config = Config()
         self.dbhelper = DbHelper()
         self._actions = {
             "sch": self.__sch,
@@ -183,7 +183,9 @@ class WebAction:
             "get_sites": self.__get_sites,
             "get_indexers": self.__get_indexers,
             "get_download_dirs": self.__get_download_dirs,
-            "find_hardlinks": self.__find_hardlinks
+            "find_hardlinks": self.__find_hardlinks,
+            "update_sites_cookie_ua": self.__update_sites_cookie_ua,
+            "set_site_captcha_code": self.__set_site_captcha_code
         }
 
     def action(self, cmd, data=None):
@@ -228,10 +230,14 @@ class WebAction:
         stop_monitor()
         # 签退
         logout_user()
-        # 关闭虚拟显示
-        os.system("ps -ef|grep -w 'Xvfb'|grep -v grep|awk '{print $1}'|xargs kill -9")
-        # 杀进程
-        os.system("ps -ef|grep -w 'NAStool'|grep -v grep|awk '{print $1}'|xargs kill -9")
+        # 退出
+        if SystemUtils.is_synology():
+            os.system("ps -ef|grep -w 'run:App'|grep -v grep|awk '{print $2}'|xargs kill -9")
+        elif SystemUtils.is_docker():
+            os.system("ps -ef|grep -w 'Xvfb'|grep -v grep|awk '{print $1}'|xargs kill -9")
+            os.system("ps -ef|grep -w 'run:App'|grep -v grep|awk '{print $1}'|xargs kill -9")
+        else:
+            os.kill(os.getpid(), getattr(signal, "SIGKILL", signal.SIGTERM))
 
     @staticmethod
     def handle_message_job(msg, client, in_from=SearchType.OT, user_id=None, user_name=None):
@@ -839,12 +845,13 @@ class WebAction:
             return {"text": text + "<br/>"}
         return {"text": ""}
 
-    def __version(self, data):
+    @staticmethod
+    def __version(data):
         """
         检查新版本
         """
         try:
-            response = RequestUtils(proxies=self.config.get_proxies()).get_res(
+            response = RequestUtils(proxies=CONFIG.get_proxies()).get_res(
                 "https://api.github.com/repos/jxxghp/nas-tools/releases/latest")
             if response:
                 ver_json = response.json()
@@ -986,19 +993,30 @@ class WebAction:
         """
         # 退出主进程
         self.shutdown_server()
+        return {"code": 0}
 
     def __update_system(self, data):
         """
         更新
         """
         # 升级
-        if "synology" in SystemUtils.execute('uname -a'):
+        if SystemUtils.is_synology():
             if SystemUtils.execute('/bin/ps -w -x | grep -v grep | grep -w "nastool update" | wc -l') == '0':
                 # 调用群晖套件内置命令升级
                 os.system('nastool update')
                 # 退出主进程
                 self.shutdown_server()
         else:
+            # 清除git代理
+            os.system("git config --global --unset http.proxy")
+            os.system("git config --global --unset https.proxy")
+            # 设置git代理
+            proxy = CONFIG.get_proxies() or {}
+            http_proxy = proxy.get("http")
+            https_proxy = proxy.get("https")
+            if http_proxy or https_proxy:
+                os.system(f"git config --global http.proxy {http_proxy or https_proxy}")
+                os.system(f"git config --global https.proxy {https_proxy or http_proxy}")
             # 清理
             os.system("git clean -dffx")
             os.system("git reset --hard HEAD")
@@ -1009,6 +1027,7 @@ class WebAction:
             os.system('pip install -r /nas-tools/requirements.txt')
             # 退出主进程
             self.shutdown_server()
+        return {"code": 0}
 
     @staticmethod
     def __logout(data):
@@ -1022,7 +1041,7 @@ class WebAction:
         """
         更新配置信息
         """
-        cfg = self.config.get_config()
+        cfg = CONFIG.get_config()
         cfgs = dict(data).items()
         # 重载配置标志
         config_test = False
@@ -1041,27 +1060,29 @@ class WebAction:
                 continue
             # 生效配置
             cfg = self.set_config_value(cfg, key, value)
-            if key.startswith('pt') \
-                    or key in ['douban.interval',
-                               'media.mediasync_interval']:
+            if key in ['douban.interval',
+                       'media.mediasync_interval',
+                       'pt.pt_check_interval',
+                       'pt.ptsignin_cron',
+                       'pt.search_rss_interval']:
                 scheduler_reload = True
-            if key.startswith("emby"):
+            if key.startswith("emby."):
                 emby_reload = True
-            if key.startswith("jellyfin"):
+            if key.startswith("jellyfin."):
                 jellyfin_reload = True
-            if key.startswith("plex"):
+            if key.startswith("plex."):
                 plex_reload = True
             if key.startswith("media.category"):
                 category_reload = True
-            if key.startswith("subtitle"):
+            if key.startswith("subtitle."):
                 subtitle_reload = True
-            if key.startswith('pt') \
-                    or key in ["downloaddir"]:
+            if key.startswith('pt.') \
+                    or key in ["downloaddir."]:
                 downloader_reload = True
 
         # 保存配置
         if not config_test:
-            self.config.save_config(cfg)
+            CONFIG.save_config(cfg)
         # 重启定时服务
         if scheduler_reload:
             Scheduler().init_config()
@@ -1468,7 +1489,8 @@ class WebAction:
             "seasons": seasons
         }
 
-    def __test_connection(self, data):
+    @staticmethod
+    def __test_connection(data):
         """
         测试连通性
         """
@@ -1490,7 +1512,7 @@ class WebAction:
                     else:
                         ret = eval(command)
                 # 重载配置
-                self.config.init_config()
+                CONFIG.init_config()
             except Exception as e:
                 ret = None
                 print(str(e))
@@ -1686,8 +1708,13 @@ class WebAction:
                 episode_events.append({
                     "type": "剧集",
                     "title": "%s 第%s季第%s集" % (
-                        name, season, episode.get("episode_number")) if season != 1 else "%s 第%s集" % (
-                        name, episode.get("episode_number")),
+                        name,
+                        season,
+                        episode.get("episode_number")
+                    ) if season != 1 else "%s 第%s集" % (
+                        name,
+                        episode.get("episode_number")
+                    ),
                     "start": episode.get("air_date"),
                     "id": tid,
                     "year": year,
@@ -1990,7 +2017,7 @@ class WebAction:
                 or target.find("telegram") != -1 \
                 or target.find("fanart") != -1 \
                 or target.find("tmdb") != -1:
-            res = RequestUtils(proxies=Config().get_proxies(), timeout=5).get_res(target)
+            res = RequestUtils(proxies=CONFIG.get_proxies(), timeout=5).get_res(target)
         else:
             res = RequestUtils(timeout=5).get_res(target)
         seconds = int((datetime.datetime.now() - start_time).microseconds / 1000)
@@ -2282,12 +2309,12 @@ class WebAction:
             rule_htmls.append('<span class="badge badge-outline text-blue me-1 mb-1" title="下载限速">下载限速: %sB/s</span>'
                               % StringUtils.str_filesize(int(rules.get("downspeed")) * 1024))
         if rules.get("include"):
-            rule_htmls.append('<span class="badge badge-outline text-green me-1 mb-1" title="包含规则">包含: %s</span>'
+            rule_htmls.append('<span class="badge badge-outline text-green me-1 mb-1 text-wrap text-start" title="包含规则">包含: %s</span>'
                               % rules.get("include"))
         if rules.get("hr"):
             rule_htmls.append('<span class="badge badge-outline text-red me-1 mb-1" title="排除HR">排除: HR</span>')
         if rules.get("exclude"):
-            rule_htmls.append('<span class="badge badge-outline text-red me-1 mb-1" title="排除规则">排除: %s</span>'
+            rule_htmls.append('<span class="badge badge-outline text-red me-1 mb-1 text-wrap text-start" title="排除规则">排除: %s</span>'
                               % rules.get("exclude"))
         if rules.get("dlcount"):
             rule_htmls.append('<span class="badge badge-outline text-blue me-1 mb-1" title="同时下载数量限制">同时下载: %s</span>'
@@ -2393,7 +2420,7 @@ class WebAction:
         """
         filename = data.get("file_name")
         if filename:
-            config_path = Config().get_config_path()
+            config_path = CONFIG.get_config_path()
             file_path = os.path.join(config_path, filename)
             try:
                 shutil.unpack_archive(file_path, config_path, format='zip')
@@ -3039,7 +3066,7 @@ class WebAction:
         # 磁盘空间
         UsedPercent = 0
         TotalSpaceList = []
-        media = Config().get_config('media')
+        media = CONFIG.get_config('media')
         if media:
             # 电影目录
             movie_paths = media.get('movie_path')
@@ -3231,7 +3258,7 @@ class WebAction:
         if not SearchWord:
             return []
         _mediaserver = MediaServer()
-        use_douban_titles = Config().get_config("laboratory").get("use_douban_titles")
+        use_douban_titles = CONFIG.get_config("laboratory").get("use_douban_titles")
         if use_douban_titles:
             _, key_word, season_num, episode_num, _, _ = StringUtils.get_keyword_from_string(SearchWord)
             medias = DouBan().search_douban_medias(keyword=key_word,
@@ -3498,7 +3525,7 @@ class WebAction:
         查询所有过滤规则
         """
         RuleGroups = Filter().get_rule_infos()
-        sql_file = os.path.join(Config().get_root_path(), "config", "init_filter.sql")
+        sql_file = os.path.join(CONFIG.get_root_path(), "config", "init_filter.sql")
         with open(sql_file, "r", encoding="utf-8") as f:
             sql_list = f.read().split(';\n')
             Init_RuleGroups = []
@@ -3532,13 +3559,13 @@ class WebAction:
         """
         维护媒体库目录
         """
-        cfg = self.set_config_directory(self.config.get_config(),
+        cfg = self.set_config_directory(CONFIG.get_config(),
                                         data.get("oper"),
                                         data.get("key"),
                                         data.get("value"),
                                         data.get("replace_value"))
         # 保存配置
-        self.config.save_config(cfg)
+        CONFIG.save_config(cfg)
         return {"code": 0}
 
     @staticmethod
@@ -3573,6 +3600,7 @@ class WebAction:
                 if not os.path.isdir(d):
                     d = os.path.dirname(d)
                 dirs = [os.path.join(d, f) for f in os.listdir(d)]
+            dirs.sort()
             for ff in dirs:
                 if os.path.isdir(ff):
                     if 'ONLYDIR' in ft or 'ALL' in ft:
@@ -3811,19 +3839,14 @@ class WebAction:
             return {"code": 1}
 
     @staticmethod
-    def __get_indexers(data):
+    def __get_indexers(data=None):
         """
         获取索引器
         """
-        check = True if data.get("check") else False
-        basic = data.get("basic")
-        if basic:
-            indexers = [{
-                "id": index.id,
-                "name": index.name
-            } for index in BuiltinIndexer().get_indexers(check=check)]
-        else:
-            indexers = [index.__dict__ for index in BuiltinIndexer().get_indexers(check=check)]
+        indexers = [{
+            "id": index.id,
+            "name": index.name
+        } for index in Searcher().indexer.get_indexers()]
         return {"code": 0, "indexers": indexers}
 
     @staticmethod
@@ -3837,11 +3860,10 @@ class WebAction:
     @staticmethod
     def __find_hardlinks(data):
         files = data.get("files")
+        file_dir = data.get("dir")
         if not files:
             return []
-        if os.name == "nt":
-            file_dir = None
-        else:
+        if not file_dir and os.name != "nt":
             # 取根目录下一级为查找目录
             file_dir = os.path.commonpath(files).replace("\\", "/")
             if file_dir != "/":
@@ -3857,3 +3879,30 @@ class WebAction:
                 print(str(e))
                 return {"code": 1}
         return {"code": 0, "data": hardlinks}
+
+    @staticmethod
+    def __update_sites_cookie_ua(data):
+        """
+        更新所有站点的Cookie和UA
+        """
+        siteid = data.get("siteid")
+        username = data.get("username")
+        password = data.get("password")
+        ocrflag = data.get("ocrflag")
+        retcode, messages = SiteCookie().update_sites_cookie_ua(siteid=siteid,
+                                                                username=username,
+                                                                password=password,
+                                                                ocrflag=ocrflag)
+        if retcode == 0:
+            Sites().init_config()
+        return {"code": retcode, "messages": messages}
+
+    @staticmethod
+    def __set_site_captcha_code(data):
+        """
+        设置站点验证码
+        """
+        code = data.get("code")
+        value = data.get("value")
+        SiteCookie().set_code(code=code, value=value)
+        return {"code": 0}

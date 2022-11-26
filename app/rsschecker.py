@@ -16,7 +16,7 @@ from app.subscribe import Subscribe
 from app.utils import RequestUtils, StringUtils
 from app.utils.commons import singleton
 from app.utils.types import MediaType, SearchType
-from config import Config
+from config import CONFIG
 
 
 @singleton
@@ -266,8 +266,8 @@ class RssChecker(object):
                 if taskinfo.get("uses") == "D":
                     # 下载
                     if media_info not in rss_download_torrents:
-                        media_info.save_path = taskinfo.get("save_path")
-                        media_info.download_setting = taskinfo.get("download_setting")
+                        media_info.set_download_info(download_setting=taskinfo.get("download_setting"),
+                                                     save_path=taskinfo.get("save_path"))
                         rss_download_torrents.append(media_info)
                 elif taskinfo.get("uses") == "R":
                     # 订阅
@@ -355,7 +355,7 @@ class RssChecker(object):
             return []
         if rss_parser.get("params"):
             _dict = {
-                "TMDBKEY": Config().get_config("app").get("rmt_tmdbkey")
+                "TMDBKEY": CONFIG.get_config("app").get("rmt_tmdbkey")
             }
             try:
                 param_url = rss_parser.get("params").format(**_dict)

@@ -4,7 +4,7 @@ from enum import Enum
 
 import log
 from app.utils.commons import singleton
-from config import Config
+from config import CONFIG
 from app.helper import DbHelper
 from app.message import Bark, IyuuMsg, PushPlus, ServerChan, Telegram, WeChat
 from app.utils import StringUtils
@@ -49,11 +49,17 @@ class Message:
     def __init__(self):
         self.dbhelper = DbHelper()
         self.messagecenter = MessageCenter()
-        self._domain = Config().get_domain()
+        self._domain = CONFIG.get_domain()
         self.init_config()
 
     def init_config(self):
         # 初始化消息客户端
+        if self._active_clients:
+            for active_client in self._active_clients:
+                if active_client.get("search_type") == SearchType.TG:
+                    tg_client = active_client.get("client")
+                    if tg_client:
+                        tg_client.enabled = False
         self._active_clients = []
         self._client_configs = {}
         for client_config in self.dbhelper.get_message_client() or []:
@@ -98,7 +104,7 @@ class Message:
             return ServerChan(conf)
         elif ctype == "bark":
             return Bark(conf)
-        elif ctype == "pushpush":
+        elif ctype == "pushplus":
             return PushPlus(conf)
         elif ctype == "iyuu":
             return IyuuMsg(conf)
@@ -109,7 +115,7 @@ class Message:
         """
         获取Emby/Jellyfin不通知的设备清单
         """
-        return self.__webhook_ignore or []
+        return self._webhook_ignore or []
 
     def __sendmsg(self, client, title, text="", image="", url="", user_id=""):
         """
@@ -127,7 +133,8 @@ class Message:
         log.info(f"【Message】发送{client.get('type')}消息服务{client.get('name')}：title={title}, text={text}")
         if self._domain:
             if url:
-                url = "%s?next=%s" % (self._domain, url)
+                if not url.startswith(self._domain):
+                    url = "%s?next=%s" % (self._domain, url)
             else:
                 url = self._domain
         else:
@@ -153,13 +160,6 @@ class Message:
         :param user_id: 用户ID，如有则只发给这个用户
         :return: 发送状态、错误信息
         """
-        if self._domain:
-            if url:
-                url = "%s?next=%s" % (self._domain, url)
-            else:
-                url = self._domain
-        else:
-            url = ""
         for client in self._active_clients:
             if client.get("search_type") == channel:
                 state = self.__sendmsg(client=client,
@@ -454,7 +454,7 @@ class Message:
         """
         发送媒体服务器的消息
         """
-        if not title or not text or image:
+        if not title or not text or not image:
             return
         # 发送消息
         for client in self._active_clients:
