@@ -4,7 +4,7 @@ import qbittorrentapi
 
 import log
 from app.utils.types import DownloaderType
-from config import CONFIG, PT_TAG
+from config import Config, PT_TAG
 from app.downloader.client.client import IDownloadClient
 from pkg_resources import parse_version as v
 
@@ -18,7 +18,7 @@ class Qbittorrent(IDownloadClient):
 
     def get_config(self):
         # 读取配置文件
-        qbittorrent = CONFIG.get_config('qbittorrent')
+        qbittorrent = Config().get_config('qbittorrent')
         if qbittorrent:
             self.host = qbittorrent.get('qbhost')
             self.port = int(qbittorrent.get('qbport')) if str(qbittorrent.get('qbport')).isdigit() else 0
@@ -113,12 +113,10 @@ class Qbittorrent(IDownloadClient):
             print(str(err))
             return False
 
-    def set_torrents_status(self, ids):
+    def set_torrents_status(self, ids, tags=None):
         if not self.qbc:
             return
         try:
-            # 删除标签
-            self.qbc.torrents_remove_tags(tags=PT_TAG, torrent_hashes=ids)
             # 打标签
             self.qbc.torrents_add_tags(tags="已整理", torrent_hashes=ids)
             # 超级做种
