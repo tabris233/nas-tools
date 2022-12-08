@@ -19,8 +19,9 @@ from app.doubansync import DoubanSync
 from app.downloader import Qbittorrent, Transmission, Downloader
 from app.filetransfer import FileTransfer
 from app.filter import Filter
-from app.helper import DbHelper, DictHelper
+from app.helper import DbHelper, DictHelper, ChromeHelper
 from app.helper import ProgressHelper, ThreadHelper, MetaHelper
+from app.helper.display_helper import DisplayHelper
 from app.helper.words_helper import WordsHelper
 from app.indexer import BuiltinIndexer
 from app.media import Category, Media, MetaInfo
@@ -38,6 +39,7 @@ from app.subscribe import Subscribe
 from app.subtitle import Subtitle
 from app.sync import Sync
 from app.sync import stop_monitor
+from app.torrentremover import TorrentRemover
 from app.utils import StringUtils, EpisodeFormat, RequestUtils, PathUtils, SystemUtils
 from app.utils.types import RMT_MODES, RmtMode, OsType
 from app.utils.types import SearchType, DownloaderType, SyncType, MediaType, SystemDictType
@@ -183,7 +185,12 @@ class WebAction:
             "get_download_dirs": self.__get_download_dirs,
             "find_hardlinks": self.__find_hardlinks,
             "update_sites_cookie_ua": self.__update_sites_cookie_ua,
-            "set_site_captcha_code": self.__set_site_captcha_code
+            "set_site_captcha_code": self.__set_site_captcha_code,
+            "update_torrent_remove_task": self.__update_torrent_remove_task,
+            "get_torrent_remove_task": self.__get_torrent_remove_task,
+            "delete_torrent_remove_task": self.__delete_torrent_remove_task,
+            "get_remove_torrents": self.__get_remove_torrents,
+            "auto_remove_torrents": self.__auto_remove_torrents
         }
 
     def action(self, cmd, data=None):
@@ -228,12 +235,16 @@ class WebAction:
         stop_monitor()
         # 签退
         logout_user()
+        # 关闭浏览器
+        ChromeHelper().quit()
+        # 关闭虚拟显示
+        DisplayHelper().quit()
         # 重启进程
         if os.name == "nt":
             os.kill(os.getpid(), getattr(signal, "SIGKILL", signal.SIGTERM))
+        elif SystemUtils.is_synology():
+            os.system("ps -ef | grep -v grep | grep 'python run.py'|awk '{print $2}'|xargs kill -9")
         else:
-            if SystemUtils.is_docker():
-                os.system("ps -ef|grep -w 'Xvfb'|grep -v grep|awk '{print $1}'|xargs kill -9")
             os.system("pm2 restart NAStool")
 
     @staticmethod
@@ -244,7 +255,7 @@ class WebAction:
         if not msg:
             return
         commands = {
-            "/ptr": {"func": Downloader().remove_torrents, "desp": "删种"},
+            "/ptr": {"func": TorrentRemover().auto_remove_torrents, "desp": "删种"},
             "/ptt": {"func": Downloader().transfer, "desp": "下载文件转移"},
             "/pts": {"func": Sites().signin, "desp": "站点签到"},
             "/rst": {"func": Sync().transfer_all_sync, "desp": "目录同步"},
@@ -387,7 +398,7 @@ class WebAction:
         启动定时服务
         """
         commands = {
-            "autoremovetorrents": Downloader().remove_torrents,
+            "autoremovetorrents": TorrentRemover().auto_remove_torrents,
             "pttransfer": Downloader().transfer,
             "ptsignin": Sites().signin,
             "sync": Sync().transfer_all_sync,
@@ -498,7 +509,7 @@ class WebAction:
         """
         tid = data.get("id")
         if id:
-            Downloader().start_torrents(tid)
+            Downloader().start_torrents(ids=tid)
         return {"retcode": 0, "id": tid}
 
     @staticmethod
@@ -508,7 +519,7 @@ class WebAction:
         """
         tid = data.get("id")
         if id:
-            Downloader().stop_torrents(tid)
+            Downloader().stop_torrents(ids=tid)
         return {"retcode": 0, "id": tid}
 
     @staticmethod
@@ -518,7 +529,7 @@ class WebAction:
         """
         tid = data.get("id")
         if id:
-            Downloader().delete_torrents(tid)
+            Downloader().delete_torrents(ids=tid, delete_file=True)
         return {"retcode": 0, "id": tid}
 
     @staticmethod
@@ -1444,6 +1455,7 @@ class WebAction:
         ret = None
         if command:
             try:
+                module_obj = None
                 if isinstance(command, list):
                     for cmd_str in command:
                         ret = eval(cmd_str)
@@ -1453,11 +1465,17 @@ class WebAction:
                     if command.find("|") != -1:
                         module = command.split("|")[0]
                         class_name = command.split("|")[1]
-                        ret = getattr(importlib.import_module(module), class_name)().get_status()
+                        module_obj = getattr(importlib.import_module(module), class_name)()
+                        if hasattr(module_obj, "init_config"):
+                            module_obj.init_config()
+                        ret = module_obj.get_status()
                     else:
                         ret = eval(command)
                 # 重载配置
                 Config().init_config()
+                if module_obj:
+                    if hasattr(module_obj, "init_config"):
+                        module_obj.init_config()
             except Exception as e:
                 ret = None
                 print(str(e))
@@ -1806,7 +1824,6 @@ class WebAction:
         if not brushtask:
             return {"code": 1, "task": {}}
         site_info = Sites().get_sites(siteid=brushtask.SITE)
-        scheme, netloc = StringUtils.get_url_netloc(site_info.get("signurl") or site_info.get("rssurl"))
         sendmessage_switch = DictHelper().get(SystemDictType.BrushMessageSwitch.value, brushtask.SITE)
         forceupload_switch = DictHelper().get(SystemDictType.BrushForceUpSwitch.value, brushtask.SITE)
         task = {
@@ -1826,7 +1843,7 @@ class WebAction:
             "download_size": StringUtils.str_filesize(brushtask.DOWNLOAD_SIZE),
             "upload_size": StringUtils.str_filesize(brushtask.UPLOAD_SIZE),
             "lst_mod_date": brushtask.LST_MOD_DATE,
-            "site_url": "%s://%s" % (scheme, netloc),
+            "site_url": StringUtils.get_base_url(site_info.get("signurl") or site_info.get("rssurl")),
             "sendmessage": sendmessage_switch,
             "forceupload": forceupload_switch
         }
@@ -3226,10 +3243,9 @@ class WebAction:
                     tmp_info.title = "%s 第%s季" % (tmp_info.title, cn2an.an2cn(meta_info.begin_season, mode='low'))
                 if tmp_info.begin_episode:
                     tmp_info.title = "%s 第%s集" % (tmp_info.title, meta_info.begin_episode)
-                tmp_info.poster_path = TMDB_IMAGE_W500_URL % tmp_info.poster_path
-                medias.append(tmp_info.__dict__)
+                medias.append(tmp_info)
 
-        return {"code": 0, "result": medias}
+        return {"code": 0, "result": [media.to_dict() for media in medias]}
 
     @staticmethod
     def get_movie_rss_list(data=None):
@@ -3291,7 +3307,10 @@ class WebAction:
             elif Client == DownloaderType.Aria2:
                 name = torrent.get('bittorrent', {}).get('info', {}).get("name")
                 # 进度
-                progress = round(int(torrent.get('completedLength')) / int(torrent.get("totalLength")), 1) * 100
+                try:
+                    progress = round(int(torrent.get('completedLength')) / int(torrent.get("totalLength")), 1) * 100
+                except ZeroDivisionError:
+                    progress = 0.0
                 state = "Downloading"
                 dlspeed = StringUtils.str_filesize(torrent.get('downloadSpeed'))
                 upspeed = StringUtils.str_filesize(torrent.get('uploadSpeed'))
@@ -3745,11 +3764,12 @@ class WebAction:
         """
         flag = data.get("flag")
         cid = data.get("cid")
+        ctype = data.get("type")
         checked = data.get("checked")
         if flag == "interactive":
-            # 最多开启一个交互
+            # TG/WX只能开启一个交互
             if checked:
-                self.dbhelper.check_message_client(interactive=0)
+                self.dbhelper.check_message_client(interactive=0, ctype=ctype)
             self.dbhelper.check_message_client(cid=cid,
                                                interactive=1 if checked else 0)
             Message().init_config()
@@ -3833,10 +3853,12 @@ class WebAction:
         siteid = data.get("siteid")
         username = data.get("username")
         password = data.get("password")
+        twostepcode = data.get("two_step_code")
         ocrflag = data.get("ocrflag")
         retcode, messages = SiteCookie().update_sites_cookie_ua(siteid=siteid,
                                                                 username=username,
                                                                 password=password,
+                                                                twostepcode=twostepcode,
                                                                 ocrflag=ocrflag)
         if retcode == 0:
             Sites().init_config()
@@ -3850,4 +3872,60 @@ class WebAction:
         code = data.get("code")
         value = data.get("value")
         SiteCookie().set_code(code=code, value=value)
+        return {"code": 0}
+
+    @staticmethod
+    def __update_torrent_remove_task(data):
+        """
+        更新自动删种任务
+        """
+        flag, msg = TorrentRemover().update_torrent_remove_task(data=data)
+        if not flag:
+            return {"code": 1, "msg": msg}
+        else:
+            TorrentRemover().init_config()
+            return {"code": 0}
+
+    @staticmethod
+    def __get_torrent_remove_task(data=None):
+        """
+        获取自动删种任务
+        """
+        if data:
+            tid = data.get("tid")
+        else:
+            tid = None
+        return {"code": 0, "detail": TorrentRemover().get_torrent_remove_tasks(taskid=tid)}
+
+    @staticmethod
+    def __delete_torrent_remove_task(data):
+        """
+        删除自动删种任务
+        """
+        tid = data.get("tid")
+        flag = TorrentRemover().delete_torrent_remove_task(taskid=tid)
+        if flag:
+            TorrentRemover().init_config()
+            return {"code": 0}
+        else:
+            return {"code": 1}
+
+    @staticmethod
+    def __get_remove_torrents(data):
+        """
+        获取满足自动删种任务的种子
+        """
+        tid = data.get("tid")
+        flag, torrents = TorrentRemover().get_remove_torrents(taskid=tid)
+        if not flag or not torrents:
+            return {"code": 1, "msg": "未获取到符合处理条件种子"}
+        return {"code": 0, "data": torrents}
+
+    @staticmethod
+    def __auto_remove_torrents(data):
+        """
+        执行自动删种任务
+        """
+        tid = data.get("tid")
+        TorrentRemover().auto_remove_torrents(taskids=tid)
         return {"code": 0}

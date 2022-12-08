@@ -50,7 +50,7 @@ DEFAULT_TMDB_IMAGE = 'https://s3.bmp.ovh/imgs/2022/07/10/77ef9500c851935b.webp'
 # 默认微信消息代理服务器地址
 DEFAULT_WECHAT_PROXY = 'https://wechat.nastool.cn'
 # 默认OCR识别服务地址
-DEFAULT_OCR_SERVER = 'https://nastool.cn/ocr/'
+DEFAULT_OCR_SERVER = 'https://nastool.cn'
 # 默认TMDB代理服务地址
 DEFAULT_TMDB_PROXY = 'https://tmdb.nastool.cn'
 # TMDB图片地址
@@ -103,7 +103,7 @@ NETTEST_TARGETS = ["www.themoviedb.org",
 # 站点签到支持的识别XPATH
 SITE_CHECKIN_XPATH = [
     '//a[@id="signed"]',
-    '//a[contains(@href, "attendance.php")]',
+    '//a[contains(@href, "attendance")]',
     '//a[contains(text(), "签到")]',
     '//a/b[contains(text(), "签 到")]',
     '//span[@id="sign_in"]/a',
@@ -136,7 +136,19 @@ SITE_LOGIN_XPATH = {
     ],
     "error": [
         "//table[@class='main']//td[@class='text']/text()"
+    ],
+    "twostep": [
+        '//input[@name="two_step_code"]',
+        '//input[@name="2fa_secret"]'
     ]
+}
+
+# WebDriver路径
+WEBDRIVER_PATH = {
+    "Windows": None,
+    "Linux": "/usr/lib/chromium/chromedriver",
+    "Synology": "/var/packages/NASTool/target/bin/chromedriver",
+    "MACOS": "/Users/nastool/chromedriver",
 }
 
 # 线程锁

@@ -1,23 +1,23 @@
+import datetime
 import math
 import random
 import traceback
-import datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 import log
 from app.doubansync import DoubanSync
-from app.mediaserver import MediaServer
-from app.subscribe import Subscribe
-from config import AUTO_REMOVE_TORRENTS_INTERVAL, PT_TRANSFER_INTERVAL, METAINFO_SAVE_INTERVAL, \
-    SYNC_TRANSFER_INTERVAL, RSS_CHECK_INTERVAL, REFRESH_PT_DATA_INTERVAL, \
-    RSS_REFRESH_TMDB_INTERVAL, META_DELETE_UNKNOWN_INTERVAL, REFRESH_WALLPAPER_INTERVAL, Config
 from app.downloader import Downloader
+from app.helper import MetaHelper
+from app.mediaserver import MediaServer
 from app.rss import Rss
 from app.sites import Sites
+from app.subscribe import Subscribe
 from app.sync import Sync
 from app.utils.commons import singleton
-from app.helper import MetaHelper
+from config import PT_TRANSFER_INTERVAL, METAINFO_SAVE_INTERVAL, \
+    SYNC_TRANSFER_INTERVAL, RSS_CHECK_INTERVAL, REFRESH_PT_DATA_INTERVAL, \
+    RSS_REFRESH_TMDB_INTERVAL, META_DELETE_UNKNOWN_INTERVAL, REFRESH_WALLPAPER_INTERVAL, Config
 from web.backend.wallpaper import get_login_wallpaper
 
 
@@ -44,14 +44,6 @@ class Scheduler:
         if not self.SCHEDULER:
             return
         if self._pt:
-            # 种子清理
-            pt_seeding_time = self._pt.get('pt_seeding_time')
-            if pt_seeding_time:
-                self.SCHEDULER.add_job(Downloader().remove_torrents,
-                                       'interval',
-                                       seconds=AUTO_REMOVE_TORRENTS_INTERVAL)
-                log.info("下载器自动删种服务启动")
-
             # 站点签到
             ptsignin_cron = str(self._pt.get('ptsignin_cron'))
             if ptsignin_cron:
