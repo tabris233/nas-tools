@@ -844,14 +844,17 @@ class WebAction:
         """
         查询实时日志
         """
-        if log.LOG_INDEX:
+        log_list = []
+        refresh_new = data.get('refresh_new')
+        if not refresh_new:
+            log_list = list(log.LOG_QUEUE)
+        elif log.LOG_INDEX:
             if log.LOG_INDEX > len(list(log.LOG_QUEUE)):
-                text = "<br/>".join(list(log.LOG_QUEUE))
+                log_list = list(log.LOG_QUEUE)
             else:
-                text = "<br/>".join(list(log.LOG_QUEUE)[-log.LOG_INDEX:])
-            log.LOG_INDEX = 0
-            return {"text": text + "<br/>"}
-        return {"text": ""}
+                log_list = list(log.LOG_QUEUE)[-log.LOG_INDEX:]
+        log.LOG_INDEX = 0
+        return {"loglist": log_list}
 
     @staticmethod
     def __version(data):
@@ -2271,13 +2274,15 @@ class WebAction:
             rule_htmls.append('<span class="badge badge-outline text-blue me-1 mb-1" title="下载限速">下载限速: %sB/s</span>'
                               % StringUtils.str_filesize(int(rules.get("downspeed")) * 1024))
         if rules.get("include"):
-            rule_htmls.append('<span class="badge badge-outline text-green me-1 mb-1 text-wrap text-start" title="包含规则">包含: %s</span>'
-                              % rules.get("include"))
+            rule_htmls.append(
+                '<span class="badge badge-outline text-green me-1 mb-1 text-wrap text-start" title="包含规则">包含: %s</span>'
+                % rules.get("include"))
         if rules.get("hr"):
             rule_htmls.append('<span class="badge badge-outline text-red me-1 mb-1" title="排除HR">排除: HR</span>')
         if rules.get("exclude"):
-            rule_htmls.append('<span class="badge badge-outline text-red me-1 mb-1 text-wrap text-start" title="排除规则">排除: %s</span>'
-                              % rules.get("exclude"))
+            rule_htmls.append(
+                '<span class="badge badge-outline text-red me-1 mb-1 text-wrap text-start" title="排除规则">排除: %s</span>'
+                % rules.get("exclude"))
         if rules.get("dlcount"):
             rule_htmls.append('<span class="badge badge-outline text-blue me-1 mb-1" title="同时下载数量限制">同时下载: %s</span>'
                               % rules.get("dlcount"))
@@ -3169,7 +3174,7 @@ class WebAction:
         """
         查询所有搜索结果
         """
-        SearchResults = []
+        SearchResults = {}
         res = self.dbhelper.get_search_results()
         for item in res:
             # 是否已存在
@@ -3183,31 +3188,45 @@ class WebAction:
                 title_string = f"{title_string} ({item.YEAR})"
             if item.ES_STRING:
                 title_string = f"{title_string} {item.ES_STRING}"
-            SearchResults.append({
-                "id": item.ID,
-                "title_string": title_string,
-                "restype": item.RES_TYPE,
-                "size": item.SIZE,
-                "seeders": item.SEEDERS,
-                "enclosure": item.ENCLOSURE,
-                "site": item.SITE,
-                "year": item.YEAR,
-                "es_string": item.ES_STRING,
-                "image": item.IMAGE,
-                "type": item.TYPE,
-                "vote": item.VOTE,
-                "torrent_name": item.TORRENT_NAME,
-                "description": item.DESCRIPTION,
-                "tmdbid": item.TMDBID,
-                "poster": item.IMAGE,
-                "overview": item.OVERVIEW,
-                "pageurl": item.PAGEURL,
-                "releasegroup": item.OTHERINFO,
-                "uploadvalue": item.UPLOAD_VOLUME_FACTOR,
-                "downloadvalue": item.DOWNLOAD_VOLUME_FACTOR,
-                "title": item.TITLE,
-                "exist": exist_flag
-            })
+            item_key = f'{item.TORRENT_NAME}-{item.SIZE}'
+            if SearchResults.get(item_key):
+                SearchResults[item_key]["torrent_list"].append({
+                    "id": item.ID,
+                    "site": item.SITE,
+                    "enclosure": item.ENCLOSURE,
+                    "description": item.DESCRIPTION,
+                    "pageurl": item.PAGEURL,
+                    "seeders": item.SEEDERS,
+                    "uploadvalue": item.UPLOAD_VOLUME_FACTOR,
+                    "downloadvalue": item.DOWNLOAD_VOLUME_FACTOR
+                })
+            else:
+                SearchResults[item_key] = {
+                    "id": item.ID,
+                    "title_string": title_string,
+                    "restype": item.RES_TYPE,
+                    "size": item.SIZE,
+                    "seeders": item.SEEDERS,
+                    "enclosure": item.ENCLOSURE,
+                    "site": item.SITE,
+                    "year": item.YEAR,
+                    "es_string": item.ES_STRING,
+                    "image": item.IMAGE,
+                    "type": item.TYPE,
+                    "vote": item.VOTE,
+                    "torrent_name": item.TORRENT_NAME,
+                    "description": item.DESCRIPTION,
+                    "tmdbid": item.TMDBID,
+                    "poster": item.IMAGE,
+                    "overview": item.OVERVIEW,
+                    "pageurl": item.PAGEURL,
+                    "releasegroup": item.OTHERINFO,
+                    "uploadvalue": item.UPLOAD_VOLUME_FACTOR,
+                    "downloadvalue": item.DOWNLOAD_VOLUME_FACTOR,
+                    "title": item.TITLE,
+                    "exist": exist_flag,
+                    "torrent_list": []
+                }
         return {"code": 0, "result": SearchResults}
 
     @staticmethod
