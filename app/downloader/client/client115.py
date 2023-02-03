@@ -1,4 +1,5 @@
 import log
+from app.utils import StringUtils
 from app.utils.types import DownloaderType
 from config import Config
 from app.downloader.client._base import _IDownloadClient
@@ -41,7 +42,7 @@ class Client115(_IDownloadClient):
             return False
         return True
 
-    def get_torrents(self, ids=None, status=None, tag=None):
+    def get_torrents(self, ids=None, status=None, **kwargs):
         tlist = []
         if not self.downclient:
             return tlist
@@ -102,7 +103,7 @@ class Client115(_IDownloadClient):
     def stop_torrents(self, ids):
         pass
 
-    def set_torrents_status(self, ids, tags=None):
+    def set_torrents_status(self, ids, **kwargs):
         return self.delete_torrents(ids=ids, delete_file=False)
 
     def get_download_dirs(self):
@@ -110,3 +111,25 @@ class Client115(_IDownloadClient):
 
     def change_torrent(self, **kwargs):
         pass
+
+    def get_downloading_progress(self):
+        """
+        获取正在下载的种子进度
+        """
+        Torrents = self.get_downloading_torrents()
+        DispTorrents = []
+        for torrent in Torrents:
+            # 进度
+            progress = round(torrent.get('percentDone'), 1)
+            state = "Downloading"
+            _dlspeed = StringUtils.str_filesize(torrent.get('peers'))
+            _upspeed = StringUtils.str_filesize(torrent.get('rateDownload'))
+            speed = "%s%sB/s %s%sB/s" % (chr(8595), _dlspeed, chr(8593), _upspeed)
+            DispTorrents.append({
+                'id': torrent.get('info_hash'),
+                'name': torrent.get('name'),
+                'speed': speed,
+                'state': state,
+                'progress': progress
+            })
+        return DispTorrents

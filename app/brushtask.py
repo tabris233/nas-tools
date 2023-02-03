@@ -106,7 +106,7 @@ class BrushTask(object):
                 "id": task.ID,
                 "name": task.NAME,
                 "site": site_info.get("name"),
-                "site_id": site_info.get("id"),
+                "site_id": task.SITE,
                 "interval": task.INTEVAL,
                 "state": task.STATE,
                 "downloader": task.DOWNLOADER,
@@ -147,20 +147,23 @@ class BrushTask(object):
         taskinfo = self.get_brushtask_info(taskid)
         if not taskinfo:
             return
-        # 检索RSS
+        # 任务属性
         seed_size = taskinfo.get("seed_size")
         task_name = taskinfo.get("name")
         site_id = taskinfo.get("site_id")
-        site_name = taskinfo.get("site")
         rss_url = taskinfo.get("rss_url")
         rss_rule = taskinfo.get("rss_rule")
         cookie = taskinfo.get("cookie")
         rss_free = taskinfo.get("free")
         ua = taskinfo.get("ua")
-        log.info("【Brush】开始站点 %s 的刷流任务：%s..." % (site_name, task_name))
-        if not site_id:
+        # 查询站点信息
+        site_info = self.sites.get_sites(siteid=site_id)
+        if not site_info:
             log.error("【Brush】刷流任务 %s 的站点已不存在，无法刷流！" % task_name)
             return
+        site_name = site_info.get("name")
+        site_proxy = site_info.get("proxy")
+
         if not rss_url:
             log.error("【Brush】站点 %s 未配置RSS订阅地址，无法刷流！" % site_name)
             return
@@ -172,6 +175,8 @@ class BrushTask(object):
         if not downloader_cfg:
             log.error("【Brush】任务 %s 下载器不存在，无法刷流！" % task_name)
             return
+
+        log.info("【Brush】开始站点 %s 的刷流任务：%s..." % (site_name, task_name))
         # 检查是否达到保种体积
         if not self.__is_allow_new_torrent(taskid=taskid,
                                            taskname=task_name,
@@ -195,8 +200,6 @@ class BrushTask(object):
                 enclosure = res.get('enclosure')
                 # 种子页面
                 page_url = res.get('link')
-                # 副标题
-                description = res.get('description')
                 # 种子大小
                 size = res.get('size')
                 # 发布时间
@@ -211,12 +214,12 @@ class BrushTask(object):
                 # 检查种子是否符合选种规则
                 if not self.__check_rss_rule(rss_rule=rss_rule,
                                              title=torrent_name,
-                                             description=description,
                                              torrent_url=page_url,
                                              torrent_size=size,
                                              pubdate=pubdate,
                                              cookie=cookie,
-                                             ua=ua):
+                                             ua=ua,
+                                             proxy=site_proxy):
                     continue
                 # 开始下载
                 log.debug("【Brush】%s 符合条件，开始下载..." % torrent_name)
@@ -231,7 +234,7 @@ class BrushTask(object):
                                            upspeed=rss_rule.get("upspeed"),
                                            downspeed=rss_rule.get("downspeed"),
                                            taskname=task_name,
-                                           site_id=site_id):
+                                           site_info=site_info):
                     # 计数
                     success_count += 1
                     # 再判断一次
@@ -559,7 +562,7 @@ class BrushTask(object):
                            upspeed,
                            downspeed,
                            taskname,
-                           site_id):
+                           site_info):
         """
         添加下载任务，更新任务数据
         :param downloadercfg: 下载器的所有参数
@@ -573,7 +576,7 @@ class BrushTask(object):
         :param upspeed: 上传限速
         :param downspeed: 下载限速
         :param taskname: 任务名称
-        :param site_id: 站点ID
+        :param site_info: 站点信息
         """
         if not downloadercfg or not enclosure:
             return False
@@ -581,13 +584,12 @@ class BrushTask(object):
         tag = "已整理" if not transfer else None
         # 下载任务ID
         download_id = None
-        # 查询站点信息
-        site_info = self.sites.get_sites(siteid=site_id)
         # 下载种子文件
         _, content, _, _, retmsg = Torrent().get_torrent_info(
             url=enclosure,
             cookie=site_info.get("cookie"),
-            ua=site_info.get("ua"))
+            ua=site_info.get("ua"),
+            proxy=site_info.get("proxy"))
         if content:
             # 添加下载
             if downloadercfg.get("type") == self._qb_client:
@@ -661,17 +663,16 @@ class BrushTask(object):
     def __check_rss_rule(self,
                          rss_rule,
                          title,
-                         description,
                          torrent_url,
                          torrent_size,
                          pubdate,
                          cookie,
-                         ua):
+                         ua,
+                         proxy):
         """
         检查种子是否符合刷流过滤条件
         :param rss_rule: 过滤条件字典
         :param title: 种子名称
-        :param description: 种子副标题
         :param torrent_url: 种子页面地址
         :param torrent_size: 种子大小
         :param pubdate: 发布时间
@@ -703,15 +704,18 @@ class BrushTask(object):
 
             # 检查包含规则
             if rss_rule.get("include"):
-                if not re.search(r"%s" % rss_rule.get("include"), "%s %s" % (title, description), re.IGNORECASE):
+                if not re.search(r"%s" % rss_rule.get("include"), title):
                     return False
 
             # 检查排除规则
             if rss_rule.get("exclude"):
-                if re.search(r"%s" % rss_rule.get("exclude"), "%s %s" % (title, description), re.IGNORECASE):
+                if re.search(r"%s" % rss_rule.get("exclude"), title):
                     return False
 
-            torrent_attr = self.sites.check_torrent_attr(torrent_url=torrent_url, cookie=cookie, ua=ua)
+            torrent_attr = self.sites.check_torrent_attr(torrent_url=torrent_url,
+                                                         cookie=cookie,
+                                                         ua=ua,
+                                                         proxy=proxy)
             torrent_peer_count = torrent_attr.get("peer_count")
             log.debug("【Brush】%s 解析详情, %s" % (title, torrent_attr))
 

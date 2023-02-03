@@ -30,6 +30,7 @@ class SearchType(Enum):
     TG = "Telegram"
     API = "第三方API请求"
     SLACK = "Slack"
+    SYNOLOGY = "Synology Chat"
 
 
 class RmtMode(Enum):
@@ -89,3 +90,4 @@ class SiteSchema(Enum):
     Unit3d = "Unit3d"
     TorrentLeech = "TorrentLeech"
     FileList = "FileList"
+    TNode = "TNode"

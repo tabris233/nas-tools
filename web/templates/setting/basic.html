@@ -55,15 +55,15 @@
                   <label class="form-label">日志级别 <span class="form-help"
                                                                title="一般情况下请选择INFO，排查问题可选择DEBUG"
                                                                data-bs-toggle="tooltip">?</span></label>
-                  <select class="form-select" id="app.wallpaper">
+                  <select class="form-select" id="app.loglevel">
                     <option value="info"
                       {% if not Config.app.loglevel or Config.app.loglevel=='info' %}selected{% endif %}>
                       INFO
                     </option>
-                    <option value="debug" {% if Config.app.wallpaper=='debug' %}selected{% endif %}>
+                    <option value="debug" {% if Config.app.loglevel=='debug' %}selected{% endif %}>
                       DEBUG
                     </option>
-                    <option value="error" {% if Config.app.wallpaper=='error' %}selected{% endif %}>
+                    <option value="error" {% if Config.app.loglevel=='error' %}selected{% endif %}>
                       ERROR
                     </option>
                   </select>
@@ -227,7 +227,7 @@
               <div class="col-lg">
                 <div class="mb-3">
                   <label class="form-label required">默认文件转移方式 <span class="form-help"
-                                                                            title="默认使用的文件转移方式；硬链接模式要求源目录和目的目录或媒体库目录在一个磁盘分区或者存储空间/共享文件夹，Docker运行时需要直接映射源目录和目的目录或媒体库目录的上级目录，否则docker仍然会认为是跨盘；移动模式会直接移动原文件，会影响做种，请谨慎使用；RCLONE针对网盘场景，需要自行映射rclone配置目录到容器中（/root/.config/rclone）或在容器内使用rclone config完成rclone配置，网盘配置名称必须为：NASTOOL;minio针对S3/云原生场景，需要自行在容器内使用mc alias set NASTOOL http://your_domain_name_or_ip:port ACCESS_KEY SECRET_KEY完成minio配置(alias的名称必须为NASTOOL)，并在minio控制台增加一个名为data的bucket(名称必须为data)"
+                                                                            title="默认使用的文件转移方式，下载器监控转移等场景使用，根据不同的程序版本可选项会有所不同。硬链接模式要求源目录和目的目录或媒体库目录在一个磁盘分区或者存储空间/共享文件夹，Docker运行时需要直接映射源目录和目的目录或媒体库目录的上级目录，否则docker仍然会认为是跨盘；移动模式会直接移动原文件，会影响做种，请谨慎使用；Rclone针对网盘场景，需要自行映射rclone配置目录到容器中（/root/.config/rclone）或在容器内使用rclone config完成rclone配置，网盘配置名称必须为：NASTOOL，可自行通过Docker添加环境变量传递参数优化传输，参考：https://rclone.org/docs/#environment-variables；Minio针对S3/云原生场景，需要自行在容器内使用mc alias set NASTOOL http://your_domain_name_or_ip:port ACCESS_KEY SECRET_KEY完成minio配置(alias的名称必须为NASTOOL)，并在minio控制台增加一个名为data的bucket(名称必须为data)"
                                                                             data-bs-toggle="tooltip">?</span></label>
                   <select class="form-select" id="pt.rmt_mode">
                   {% for mode in RmtModeDict %}
@@ -249,16 +249,16 @@
             <div class="row">
               <div class="col-lg">
                 <div class="mb-3">
-                  <label class="form-label">转移文件夹黑名单 <span class="form-help"
-                                                                   title="文件所在上级文件夹名称在黑名单中的，忽略转移"
+                  <label class="form-label">文件路径转移忽略词 <span class="form-help"
+                                                                   title="文件路径包含忽略词的，忽略转移，支持正则表达式，注意特殊字符转义"
                                                                    data-bs-toggle="tooltip">?</span></label>
                   <input type="text" value="{{ Config.media.ignored_paths or '' }}" class="form-control"
-                         id="media.ignored_paths" placeholder="使用;分隔" autocomplete="off">
+                         id="media.ignored_paths" placeholder="支持正则表达式，使用;分隔" autocomplete="off">
                 </div>
               </div>
               <div class="col-lg">
                 <div class="mb-3">
-                  <label class="form-label">文件转移忽略词 <span class="form-help"
+                  <label class="form-label">文件名转移忽略词 <span class="form-help"
                                                                  title="文件名（包括扩展名）包含忽略词的，忽略转移，支持正则表达式，注意特殊字符转义"
                                                                  data-bs-toggle="tooltip">?</span></label>
                   <input type="text" value="{{ Config.media.ignored_files or '' }}" class="form-control"
@@ -396,8 +396,8 @@
               </div>
               <div class="col-xl">
                 <div class="mb-3">
-                  <label class="form-label">订阅搜索周期(天) <span class="form-help"
-                                                                   title="定时对订阅内容进行存量资源搜索，以天为单位，最小间隔为1天，该项会对站点造成搜索压力，如非必要请不要开启"
+                  <label class="form-label">订阅搜索周期(小时) <span class="form-help"
+                                                                   title="定时对电影/电视剧订阅进行站点存量资源检索下载，用于对RSS订阅进行查漏补缺。以小时为单位，最小间隔为6小时，设置小于6小时时将强制设定为6小时。该项会对站点造成压力，应尽量通过维护站点RSS实现订阅追新，如非必要请不要开启"
                                                                    data-bs-toggle="tooltip">?</span></label>
                   <input type="text" value="{{ Config.pt.search_rss_interval or '' }}" class="form-control"
                          id="pt.search_rss_interval" placeholder="留空关闭订阅定时搜索" autocomplete="off">
@@ -510,6 +510,23 @@
                   <input type="text"
                          value="{% if Config.security.telegram_webhook_allow_ip %}{{ Config.security.telegram_webhook_allow_ip.ipv6 or '' }}{% endif %}"
                          class="form-control" id="security.telegram_webhook_allow_ip.ipv6" placeholder="允许的IPv6 CIDR"
+                         autocomplete="off">
+                </div>
+              </div>
+              <div class="col-12 col-lg">
+                <div class="mb-1">
+                  <label class="form-label">Synology Chat源地址 <span class="form-help"
+                                                                 title="仅接收配置的地址范围内发送的Synology Chat消息，多个地址段用,号分隔，配置为0.0.0.0/0,::/0则不做限制，为了安全建议按实际情况设置"
+                                                                 data-bs-toggle="tooltip">?</span></label>
+                  <input type="text"
+                         value="{% if Config.security.synology_webhook_allow_ip %}{{ Config.security.synology_webhook_allow_ip.ipv4 or '' }}{% endif %}"
+                         class="form-control" id="security.synology_webhook_allow_ip.ipv4" placeholder="允许的IPv4 CIDR"
+                         autocomplete="off">
+                </div>
+                <div class="mb-3">
+                  <input type="text"
+                         value="{% if Config.security.synology_webhook_allow_ip %}{{ Config.security.synology_webhook_allow_ip.ipv6 or '' }}{% endif %}"
+                         class="form-control" id="security.synology_webhook_allow_ip.ipv6" placeholder="允许的IPv6 CIDR"
                          autocomplete="off">
                 </div>
               </div>
@@ -990,11 +1007,7 @@
 <script type="text/javascript">
   // 保存基础设置
   function save_basic_config(type) {
-    let params = input_GetInputVal(type);
-    $(`#${type} select`).each(function () {
-      const key = $(this).attr("id");
-      params[key] = $(this).val();
-    });
+    let params = input_select_GetVal(type);
     if (type !== "modal-scraper") {
       $("#" + type + "_btn").text("保存中...").attr("disabled", true);
     }

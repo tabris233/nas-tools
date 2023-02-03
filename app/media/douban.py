@@ -159,7 +159,7 @@ class DouBan:
             sleep(time)
         return self.doubanweb.user(cookie=self.cookie, userid=userid)
 
-    def search_douban_medias(self, keyword, mtype: MediaType = None, num=20, season=None, episode=None):
+    def search_douban_medias(self, keyword, mtype: MediaType = None, season=None, episode=None, page=1):
         """
         根据关键字搜索豆瓣，返回可能的标题和年份信息
         """
@@ -201,7 +201,7 @@ class DouBan:
             if meta_info not in ret_medias:
                 ret_medias.append(meta_info)
 
-        return ret_medias[:num]
+        return ret_medias[(page - 1) * 20:page * 20]
 
     def get_media_detail_from_web(self, doubanid):
         """
@@ -337,7 +337,58 @@ class DouBan:
         return self.__refresh_movie(infos.get("subject_collection_items"))
 
     @staticmethod
-    def __refresh_movie(infos):
+    def __dict_item(info, media_type):
+        """
+        转化为字典
+        """
+        # ID
+        rid = info.get("id")
+        # 评分
+        rating = info.get('rating')
+        if rating:
+            vote_average = float(rating.get("value"))
+        else:
+            vote_average = 0
+        # 标题
+        title = info.get('title')
+        # 年份
+        year = info.get('year')
+
+        if media_type == MediaType.MOVIE:
+            type_str = "MOV"
+            # 海报
+            poster_path = info.get('cover', {}).get("url")
+            if not poster_path:
+                poster_path = info.get('cover_url')
+            # 简介
+            overview = info.get("card_subtitle") or ""
+            if not year and overview:
+                if overview.split("/")[0].strip().isdigit():
+                    year = overview.split("/")[0].strip()
+        else:
+            type_str = "TV"
+            # 海报
+            poster_path = info.get('pic', {}).get("normal")
+            # 简介
+            overview = info.get("comment") or ""
+
+        # 高清海报
+        if poster_path:
+            poster_path = poster_path.replace("s_ratio_poster", "m_ratio_poster")
+
+        return {
+            'id': "DB:%s" % rid,
+            'orgid': rid,
+            'title': title,
+            'type': type_str,
+            'media_type': media_type.value,
+            'year': year[:4] if year else "",
+            'vote': vote_average,
+            'image': poster_path,
+            'overview': overview
+        }
+
+    def __refresh_movie(self, infos):
         if not infos:
             return []
         ret_list = []
@@ -345,37 +396,12 @@ class DouBan:
             try:
                 if not info:
                     continue
-                # ID
-                rid = info.get("id")
-                # 评分
-                rating = info.get('rating')
-                if rating:
-                    vote_average = float(rating.get("value"))
-                else:
-                    vote_average = 0
-                # 年份
-                year = info.get('year')
-                # 海报
-                poster_path = info.get('cover', {}).get("url")
-                if not poster_path:
-                    poster_path = info.get('cover_url')
-                # 标题
-                title = info.get('title')
-                if not title or not poster_path:
-                    continue
-                # 简介
-                overview = info.get("card_subtitle") or ""
-                if not year and overview:
-                    if overview.split("/")[0].strip().isdigit():
-                        year = overview.split("/")[0].strip()
-                ret_list.append({'id': rid, 'title': title, 'release_date': year, 'vote_average': vote_average,
-                                 'poster_path': poster_path, 'overview': overview})
+                ret_list.append(self.__dict_item(info, MediaType.MOVIE))
             except Exception as e:
                 ExceptionUtils.exception_traceback(e)
         return ret_list
 
-    @staticmethod
-    def __refresh_tv(infos):
+    def __refresh_tv(self, infos):
         if not infos:
             return []
         ret_list = []
@@ -383,26 +409,7 @@ class DouBan:
             try:
                 if not info:
                     continue
-                # ID
-                rid = info.get("id")
-                # 评分
-                rating = info.get('rating')
-                if rating:
-                    vote_average = float(rating.get("value"))
-                else:
-                    vote_average = 0
-                # 年份
-                year = info.get('year')
-                # 海报
-                poster_path = info.get('pic', {}).get("normal")
-                # 标题
-                title = info.get('title')
-                if not title or not poster_path:
-                    continue
-                # 简介
-                overview = info.get("comment") or ""
-                ret_list.append({'id': rid, 'name': title, 'first_air_date': year, 'vote_average': vote_average,
-                                 'poster_path': poster_path, 'overview': overview})
+                ret_list.append(self.__dict_item(info, MediaType.TV))
             except Exception as e:
                 ExceptionUtils.exception_traceback(e)
         return ret_list

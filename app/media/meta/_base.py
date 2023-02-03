@@ -61,6 +61,8 @@ class MetaBase(object):
     tvdb_id = 0
     # 豆瓣 ID
     douban_id = 0
+    # 自定义搜索词
+    keyword = None
     # 媒体标题
     title = None
     # 媒体原语种
@@ -69,6 +71,8 @@ class MetaBase(object):
     original_title = None
     # 媒体发行日期
     release_date = None
+    # 播放时长
+    runtime = 0
     # 媒体年份
     year = None
     # 封面图片
@@ -83,7 +87,7 @@ class MetaBase(object):
     # TMDB 的其它信息
     tmdb_info = {}
     # 本地状态 1-已订阅 2-已存在
-    fav = 0
+    fav = "0"
     # 站点列表
     rss_sites = []
     search_sites = []
@@ -98,6 +102,10 @@ class MetaBase(object):
     enclosure = None
     # 资源优先级
     res_order = 0
+    # 使用的过滤规则
+    filter_rule = None
+    # 是否洗版
+    over_edition = None
     # 种子大小
     size = 0
     # 做种者
@@ -480,12 +488,13 @@ class MetaBase(object):
             self.tvdb_id = info.get("external_ids", {}).get("tvdb_id", 0)
             self.imdb_id = info.get("external_ids", {}).get("imdb_id", "")
         self.tmdb_info = info
-        self.vote_average = round(info.get('vote_average'), 1)
+        self.vote_average = round(float(info.get('vote_average')), 1) if info.get('vote_average') else 0
         self.overview = info.get('overview')
         if self.type == MediaType.MOVIE:
             self.title = info.get('title')
             self.original_title = info.get('original_title')
             self.original_language = info.get('original_language')
+            self.runtime = info.get("runtime")
             self.release_date = info.get('release_date')
             if self.release_date:
                 self.year = self.release_date[0:4]
@@ -494,6 +503,7 @@ class MetaBase(object):
             self.title = info.get('name')
             self.original_title = info.get('original_name')
             self.original_language = info.get('original_language')
+            self.runtime = info.get("episode_run_time")[0] if info.get("episode_run_time") else None
             self.release_date = info.get('first_air_date')
             if self.release_date:
                 self.year = self.release_date[0:4]
@@ -512,6 +522,7 @@ class MetaBase(object):
                          site_order=0,
                          enclosure=None,
                          res_order=0,
+                         filter_rule=None,
                          size=0,
                          seeders=0,
                          peers=0,
@@ -521,7 +532,8 @@ class MetaBase(object):
                          download_volume_factor=None,
                          rssid=None,
                          hit_and_run=None,
-                         imdbid=None):
+                         imdbid=None,
+                         over_edition=None):
         if site:
             self.site = site
         if site_order:
@@ -530,6 +542,8 @@ class MetaBase(object):
             self.enclosure = enclosure
         if res_order:
             self.res_order = res_order
+        if filter_rule:
+            self.filter_rule = filter_rule
         if size:
             self.size = size
         if seeders:
@@ -550,6 +564,8 @@ class MetaBase(object):
             self.hit_and_run = hit_and_run
         if imdbid is not None:
             self.imdb_id = imdbid
+        if over_edition is not None:
+            self.over_edition = over_edition
 
     # 整合下载参数
     def set_download_info(self, download_setting=None, save_path=None):
@@ -674,13 +690,16 @@ class MetaBase(object):
         转化为字典
         """
         return {
+            "id": self.tmdb_id,
+            'orgid': self.tmdb_id,
             "title": self.title,
             "year": self.year,
             "type": self.type.value if self.type else "",
+            "media_type": self.type.value if self.type else "",
+            'vote': self.vote_average,
+            'image': self.poster_path,
             "imdb_id": self.imdb_id,
             "tmdb_id": self.tmdb_id,
             "overview": str(self.overview).strip() if self.overview else '',
-            "poster_path": self.poster_path,
-            "backdrop_path": self.backdrop_path,
             "link": self.get_detail_url()
         }

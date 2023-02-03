@@ -19,6 +19,13 @@
           <a href="javascript:show_site_modal()" class="btn btn-primary d-sm-none btn-icon">
             {{ SVG.plus() }}
           </a>
+          <a href="javascript:show_cookiecloud_modal()" class="btn btn-twitter d-none d-sm-inline-block">
+            {{ SVG.refresh_dot() }}
+            CookieCloud
+          </a>
+          <a href="javascript:show_cookiecloud_modal()" class="btn btn-twitter d-sm-none btn-icon">
+            {{ SVG.refresh_dot() }}
+          </a>
           <a href="javascript:show_sitetest_modal()" class="btn d-none d-sm-inline-block">
             {{ SVG.activity_heartbeat() }}
             站点测试
@@ -34,78 +41,80 @@
 {% if Sites %}
 <div class="page-body">
   <div class="container-xl">
-    <div class="row row-cards">
+    <div class="d-grid gap-3 grid-info-card">
       {% for Site in Sites %}
-      <div class="col-12 col-md-6 col-xl-4">
-        <div class="card card-link-pop">
-          <div class="card-header">
-            <h3 class="card-title">
-              <span class="badge badge-pill bg-teal"><small>{{ Site.pri }}</small></span>
-              <a href="{% if Site.signurl %}{{ Site.signurl }}{% else %}javascript:void(0){% endif %}"
-              {% if Site.signurl %}target="_blank" {% endif %} class="ms-1">
-                <strong>{{ Site.name }}</strong>
-                </a>
-            </h3>
-            <div class="card-actions btn-actions">
-              <a href="javascript:edit_site('{{ Site.id }}')" class="btn-action ms-1" title="编辑站点">
-                {{ SVG.edit() }}
+      <div class="card card-link-pop">
+        <div class="card-header">
+          <h3 class="card-title">
+            <span class="badge badge-pill bg-teal"><small>{{ Site.pri }}</small></span>
+            <a href="{% if Site.signurl %}{{ Site.signurl }}{% else %}javascript:void(0){% endif %}"
+            {% if Site.signurl %}target="_blank" {% endif %} class="ms-1">
+              <strong>{{ Site.name }}</strong>
               </a>
-              {% if ChromeOk %}
-              <a href="javascript:show_site_cookie_ua_modal('{{ Site.id }}', '{{ Site.name }}')" class="btn-action ms-1" title="更新站点Cookie和User-Agent">
-                {{ SVG.refresh_dot() }}
-              </a>
-              {% endif %}
-              <a href="javascript:remove_site('{{ Site.name }}', '{{ Site.id }}')" class="btn-action ms-1" title="删除站点">
-                {{ SVG.x() }}
-              </a>
-            </div>
+          </h3>
+          <div class="card-actions btn-actions">
+            <a href="javascript:edit_site('{{ Site.id }}')" class="btn-action ms-1" title="编辑站点">
+              {{ SVG.edit() }}
+            </a>
+            {% if ChromeOk %}
+            <a href="javascript:show_site_cookie_ua_modal('{{ Site.id }}', '{{ Site.name }}')" class="btn-action ms-1" title="更新站点Cookie和User-Agent">
+              {{ SVG.refresh_dot() }}
+            </a>
+            {% endif %}
+            <a href="javascript:remove_site('{{ Site.name }}', '{{ Site.id }}')" class="btn-action ms-1" title="删除站点">
+              {{ SVG.x() }}
+            </a>
           </div>
-          <div class="card-body">
-            <dl class="row">
-              {% if Site.signurl %}
-              <dt class="col-3">站点地址:</dt>
-              <dd class="col-9">{{ Site.signurl }}</dd>
+        </div>
+        <div class="card-body">
+          <dl class="row">
+            {% if Site.signurl %}
+            <dt class="col-3">站点地址:</dt>
+            <dd class="col-9">{{ Site.signurl }}</dd>
+            {% endif %}
+            {% if Site.cookie %}
+            <dt class="col-3">COOKIE:</dt>
+            <dd class="col-9">***</dd>
+            {% endif %}
+            {% if Site.rssurl %}
+            <dt class="col-3">RSS地址:</dt>
+            <dd class="col-9">***</dd>
+            {% endif %}
+            {% if Site.rule and Site.rule|string in RuleGroups %}
+            <dt class="col-3">过滤规则:</dt>
+            <dd class="col-9"><span class="badge bg-orange me-2">{{ RuleGroups[Site.rule|string] }}</span></dd>
+            {% endif %}
+            {% if Site.download_setting and Site.download_setting|string in DownloadSettings %}
+            <dt class="col-3">下载设置:</dt>
+            <dd class="col-9"><span class="badge bg-lime me-2">{{ DownloadSettings[Site.download_setting|string] }}</span></dd>
+            {% endif %}
+          </dl>
+          <div class="row">
+            <div class="col">
+              {% if Site.signin_enable and (Site.signurl or Site.rssurl) %}
+              <span class="badge bg-blue-lt mb-1 me-1">签到</span>
               {% endif %}
-              {% if Site.cookie %}
-              <dt class="col-3">COOKIE:</dt>
-              <dd class="col-9">***</dd>
+              {% if Site.rss_enable and Site.rssurl %}
+              <span class="badge bg-azure-lt mb-1 me-1">订阅</span>
               {% endif %}
-              {% if Site.rssurl %}
-              <dt class="col-3">RSS地址:</dt>
-              <dd class="col-9">***</dd>
+              {% if Site.brush_enable and Site.rssurl %}
+              <span class="badge bg-indigo-lt mb-1 me-1">刷流</span>
               {% endif %}
-              {% if Site.rule %}
-              <dt class="col-3">过滤规则:</dt>
-              <dd class="col-9"><span class="badge bg-orange me-2">{{ RuleGroups[Site.rule|string] }}</span></dd>
+              {% if Site.statistic_enable and (Site.signurl or Site.rssurl) %}
+              <span class="badge bg-purple-lt mb-1 me-1">数据统计</span>
               {% endif %}
-            </dl>
-            <div class="row">
-              <div class="col">
-                {% if Site.signin_enable and (Site.signurl or Site.rssurl) %}
-                <span class="badge bg-blue-lt mb-1 me-1">签到</span>
-                {% endif %}
-                {% if Site.rss_enable and Site.rssurl %}
-                <span class="badge bg-azure-lt mb-1 me-1">订阅</span>
-                {% endif %}
-                {% if Site.brush_enable and Site.rssurl %}
-                <span class="badge bg-indigo-lt mb-1 me-1">刷流</span>
-                {% endif %}
-                {% if Site.statistic_enable and (Site.signurl or Site.rssurl) %}
-                <span class="badge bg-purple-lt mb-1 me-1">数据统计</span>
-                {% endif %}
-                {% if Site.parse == 'Y' %}
-                <span class="badge bg-pink-lt mb-1 me-1">解析</span>
-                {% endif %}
-                {% if Site.unread_msg_notify == 'Y' %}
-                <span class="badge bg-orange-lt mb-1 me-1">消息</span>
-                {% endif %}
-                {% if Site.chrome == 'Y' %}
-                <span class="badge bg-yellow-lt mb-1 me-1">仿真</span>
-                {% endif %}
-                {% if Site.proxy == 'Y' %}
-                <span class="badge bg-lime-lt mb-1 me-1">代理</span>
-                {% endif %}
-              </div>
+              {% if Site.parse %}
+              <span class="badge bg-pink-lt mb-1 me-1">解析</span>
+              {% endif %}
+              {% if Site.unread_msg_notify %}
+              <span class="badge bg-orange-lt mb-1 me-1">消息</span>
+              {% endif %}
+              {% if Site.chrome %}
+              <span class="badge bg-yellow-lt mb-1 me-1">仿真</span>
+              {% endif %}
+              {% if Site.proxy %}
+              <span class="badge bg-lime-lt mb-1 me-1">代理</span>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -207,24 +216,35 @@
           </div>
           <div class="col-lg-4">
             <div class="mb-3">
+              <label class="form-label required">发送站点未读消息通知 <span class="form-help" title="选择是时检测到站点有未读消息会通过消息推送通知"
+                  data-bs-toggle="tooltip">?</span></label>
+              <select class="form-select" id="site_unread_msg_notify">
+                <option value="Y" selected>是</option>
+                <option value="N">否</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-lg-2">
+            <div class="mb-3">
               <label class="form-label">过滤规则 <span class="form-help"
                   title="选择该站点使用的过滤规则组，在设置->过滤规则中设置规则，选择了过滤规则后该站点只有符合规则的种子才会被命中下载；仅作用于RSS、内建索引自动搜索，刷流等不受此限制"
                   data-bs-toggle="tooltip">?</span></label>
               <select class="form-select" id="site_rule">
-                <option value="" selected>请选择</option>
+                <option value="" selected>默认</option>
                 {% for Id, Attr in RuleGroups.items() %}
                 <option value="{{ Id }}">{{ Attr }}</option>
                 {% endfor %}
               </select>
             </div>
           </div>
-          <div class="col-lg-4">
+          <div class="col-lg-2">
             <div class="mb-3">
-              <label class="form-label required">发送站点未读消息通知 <span class="form-help" title="选择是时检测到站点有未读消息会通过消息推送通知"
-                  data-bs-toggle="tooltip">?</span></label>
-              <select class="form-select" id="site_unread_msg_notify">
-                <option value="Y" selected>是</option>
-                <option value="N">否</option>
+              <label class="form-label">下载设置</label>
+              <select class="form-select" id="site_download_setting">
+                <option value="">默认</option>
+                {% for Id, Attr in DownloadSettings.items() %}
+                <option value="{{ Id }}">{{ Attr }}</option>
+                {% endfor %}
               </select>
             </div>
           </div>
@@ -390,6 +410,52 @@
     </div>
   </div>
 </div>
+<div class="modal modal-blur fade" id="modal-cookiecloud" tabindex="-1" role="dialog" aria-hidden="true"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cookieua_modal_title">CookieCloud数据同步</h5>
+        <input type="hidden" id="cookieua_siteid">
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-lg">
+            <div class="mb-3">
+              <label class="form-label required">服务器地址 <span class="form-help"
+                                                              title="参考https://github.com/easychen/CookieCloud搭建私有CookieCloud服务器；也可使用默认的公共服务器，公共服务器不会存储任何非加密用户数据，也不会存储用户KEY、端对端加密密码，但要注意千万不要对外泄露加密信息，否则Cookie数据也会被泄露！"
+                                                              data-bs-toggle="tooltip">?</span></label>
+              <input type="text" value="{{ CookieCloudCfg.server }}" id="cookiecloud_server" class="form-control" placeholder="http://nastool.cn:8088">
+            </div>
+          </div>
+          <div class="col-lg">
+            <div class="mb-3">
+              <label class="form-label required">用户KEY <span class="form-help"
+                                                              title="在浏览器CookieCloud插件中获取，使用公共服务器时注意不要泄露该信息"
+                                                              data-bs-toggle="tooltip">?</span></label>
+              <input type="text" value="{{ CookieCloudCfg.key }}" id="cookiecloud_key" class="form-control" placeholder="">
+            </div>
+          </div>
+          <div class="col-lg">
+            <div class="mb-3">
+              <label class="form-label required">端对端加密密码 <span class="form-help"
+                                                              title="在浏览器CookieCloud插件中获取，使用公共服务器时注意不要泄露该信息"
+                                                              data-bs-toggle="tooltip">?</span></label>
+              <input type="password" value="{{ CookieCloudCfg.password }}" id="cookiecloud_password" class="form-control" placeholder="">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">
+          取消
+        </button>
+        <button onclick="sync_site_cookiecloud()" id="cookiecloud_syncbtn" class="btn btn-primary">开始同步</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal modal-blur fade" id="modal-captcha-code" tabindex="-1" role="dialog" aria-hidden="true"
      data-bs-backdrop="static" data-bs-keyboard="false">
   <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
@@ -448,12 +514,32 @@
         $("#site_rssurl").val(ret.site.rssurl);
         $("#site_signurl").val(ret.site.signurl);
         $("#site_cookie").val(ret.site.cookie);
-        $("#site_parse").val(ret.site.parse);
         $("#site_ua").val(ret.site.ua);
-        $("#site_chrome").val(ret.site.chrome);
-        $("#site_proxy").val(ret.site.proxy);
-        $("#site_subtitle").val(ret.site.subtitle);
-        $("#site_unread_msg_notify").val(ret.site.unread_msg_notify)
+        if (ret.site.parse) {
+          $("#site_parse").val("Y");
+        } else {
+          $("#site_parse").val("N");
+        }
+        if (ret.site.chrome) {
+          $("#site_chrome").val("Y");
+        } else {
+          $("#site_chrome").val("N");
+        }
+        if (ret.site.proxy) {
+          $("#site_proxy").val("Y");
+        } else {
+          $("#site_proxy").val("N");
+        }
+        if (ret.site.subtitle) {
+          $("#site_subtitle").val("Y");
+        } else {
+          $("#site_subtitle").val("N");
+        }
+        if (ret.site.unread_msg_notify) {
+          $("#site_unread_msg_notify").val("Y");
+        } else {
+          $("#site_unread_msg_notify").val("N");
+        }
         select_SelectPart(ret.site.uses, "site_uses")
         $("#modal-site-title").text("编辑站点");
         $("#add_or_edit_site_btn").text("修改");
@@ -511,6 +597,7 @@
       }
     }
     let site_rule = $("#site_rule").val();
+    let site_download_setting = $("#site_download_setting").val();
     let site_parse = $("#site_parse").val();
     let site_unread_msg_notify = $("#site_unread_msg_notify").val();
     let site_uses = select_GetSelectedVAL("site_uses").join("");
@@ -534,6 +621,7 @@
       "site_include": site_uses,
       "site_note": {
         "rule": site_rule,
+        "download_setting": site_download_setting,
         "parse": site_parse,
         "ua": ua,
         "chrome": chrome,
@@ -586,6 +674,11 @@
   //显示测试站点
   function show_sitetest_modal() {
     $("#modal-sitetest").modal("show");
+  }
+
+  //显示CookieCloud同步对话框
+  function show_cookiecloud_modal() {
+    $("#modal-cookiecloud").modal("show");
   }
 
   //测试一个站点
@@ -665,6 +758,45 @@
       refresh_sitecookie_current = "";
     }, true, false);
 
+  }
+
+  // 同步CookieCloud中的站点Cookie数据
+  function sync_site_cookiecloud(){
+    const server = $("#cookiecloud_server").val();
+    const key = $("#cookiecloud_key").val();
+    const password = $("#cookiecloud_password").val();
+    if (!server) {
+      $("#cookiecloud_server").addClass("is-invalid");
+      return;
+    }else{
+      $("#cookiecloud_server").removeClass("is-invalid");
+    }
+    if (!key) {
+      $("#cookiecloud_key").addClass("is-invalid");
+      return;
+    }else{
+      $("#cookiecloud_key").removeClass("is-invalid");
+    }
+    if (!password) {
+      $("#cookiecloud_password").addClass("is-invalid");
+      return;
+    }else{
+      $("#cookiecloud_password").removeClass("is-invalid");
+    }
+    $("#cookiecloud_syncbtn").text("正在同步...").attr("disabled", true);
+    ajax_post("cookiecloud_sync", { server: server, key: key, password: password }, function (ret) {
+      $("#cookiecloud_syncbtn").text("开始同步").attr("disabled", false);
+      $("#modal-cookiecloud").modal("hide");
+      if (ret.code === 0) {
+        show_success_modal(ret.msg, function (){
+          window_history_refresh();
+        });
+      } else {
+        show_fail_modal(ret.msg, function(){
+          $("#modal-cookiecloud").modal("show");
+        });
+      }
+    });
   }
 
   // 刷新进度标志

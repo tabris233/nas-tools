@@ -5,6 +5,7 @@
     <div class="row align-items-center">
       <div class="col">
         <h2 class="page-title" id="recommend_title"></h2>
+        <div class="text-muted mt-1" id="recommend_subtitle"></div>
       </div>
     </div>
   </div>
@@ -12,7 +13,7 @@
 <!-- 业务页面代码 -->
 <div class="page-body">
   <div class="container-xl">
-    <div class="row row-cards" id="recommend_content">
+    <div class="d-grid gap-3 grid-media-card" id="recommend_content">
     </div>
   </div>
 </div>
@@ -20,53 +21,44 @@
   // 当前页码
   var CurrentPage = {{ CurrentPage }};
 
+  // 类型 MOV/TV/BANGUMI
+  var Type = '{{ Type }}';
+
+  // 子类型
+  var SubType = '{{ SubType }}';
+
   // 标题
-  var title_type = '{{ RecommendType }}';
-  if (title_type == "hm") {
-    $("#recommend_title").text("TMDB热门电影");
-  }
-  if (title_type == "ht") {
-    $("#recommend_title").text("TMDB热门电视剧");
-  }
-  if (title_type == "nm") {
-    $("#recommend_title").text("TMDB最新电影");
-  }
-  if (title_type == "nt") {
-    $("#recommend_title").text("TMDB最新电视剧");
-  }
-  if (title_type == "dbom") {
-    $("#recommend_title").text("正在热映");
-  }
-  if (title_type == "dbhm") {
-    $("#recommend_title").text("豆瓣热门电影");
-  }
-  if (title_type == "dbtop") {
-    $("#recommend_title").text("豆瓣电影TOP250");
-  }
-  if (title_type == "dbht") {
-    $("#recommend_title").text("豆瓣热门电视剧");
-  }
-  if (title_type == "dbdh") {
-    $("#recommend_title").text("豆瓣热门动漫");
-  }
-  if (title_type == "dbnm") {
-    $("#recommend_title").text("即将上映");
-  }
-  if (title_type == "dbzy") {
-    $("#recommend_title").text("豆瓣热门综艺");
-  }
-  if (title_type == "bangumi") {
-    $("#recommend_title").text("Bangumi每日放送");
+  var Title = '{{ Title }}';
+  $("#recommend_title").text(Title);
+
+  // 子标题
+  var SubTitle = '{{ SubTitle or "" }}';
+  if (SubTitle) {
+    $("#recommend_subtitle").text(SubTitle).show();
+  } else {
+    $("#recommend_subtitle").hide();
   }
 
   // 星期
   var Week = '{{ Week }}';
 
+  // TMDBID
+  var TmdbId = '{{ TmdbId }}';
+
+  // 演员ID
+  var PersonId = '{{ PersonId }}';
+
+  // 关键字
+  var Keyword = '{{ Keyword }}';
+
+  // 来源
+  var Source = '{{ Source }}';
+
   // 插入N个占位卡片 代替loading动画
   var page_card_num = 20;
   function add_loading_card_placeholder() {
     for (let i = 0; i < page_card_num; i++) {
-      let html = '<div class="col-6 col-md-3 col-xl-2" id="loading_card_placeholder_' + i + '"><normal-card-placeholder></normal-card-placeholder></div>';
+      let html = '<div id="loading_card_placeholder_' + i + '"><normal-card-placeholder></normal-card-placeholder></div>';
       $("#recommend_content").append(html);
     }
   }
@@ -87,7 +79,16 @@
     }
     loading = true;
     add_loading_card_placeholder();
-    ajax_post("get_recommend", { "type": title_type, "page": CurrentPage, "week": Week }, function (ret) {
+    ajax_post("get_recommend", {
+      "type": Type,
+      "subtype": SubType,
+      "page": CurrentPage,
+      "week": Week,
+      "tmdbid": TmdbId,
+      "personid": PersonId,
+      "keyword": Keyword,
+      "source": Source
+    }, function (ret) {
       if (ret.Items.length > 0) {
         // 记录页码
         CurrentPage++;
@@ -96,32 +97,47 @@
         page_card_num = ret.Items.length;
       } else {
         if (CurrentPage == 1) {
-          $("#recommend_content").html($("#no_recommend_html").text());
+          $("#recommend_content").removeClass("grid-media-card").html($("#no_recommend_html").text());
         }
       }
       del_loading_card_placeholder();
       // 插入HTML
       for (let i = 0; i < ret.Items.length; i++) {
         let item = ret.Items[i];
-        let html = '';
-        html += '<div class="col-6 col-md-3 col-xl-2">';
-          html += `<normal-card
-                    card-tmdbId="${item.id}"
-                    card-pageType="${title_type}"
-                    card-showSub="1"
-                    card-image="${item.image}"
-                    card-weekday="${item.weekday}"
-                    card-fav="${item.fav}"
-                    card-vote="${item.vote}"
-                    card-year="${item.year}"
-                    card-title="${item.title}"
-                    card-overview="${item.overview}"
-                   ></normal-card>`;
-        html += '</div>';
+        let html = `<normal-card
+                      card-tmdbId="${item.id}"
+                      card-mediatype="${item.media_type}"
+                      card-showSub="1"
+                      card-image="${item.image}"
+                      card-weekday="${item.weekday}"
+                      card-fav="${item.fav}"
+                      card-vote="${item.vote}"
+                      card-year="${item.year}"
+                      card-title="${item.title}"
+                      card-overview="${item.overview}"
+                      card-restype="${item.media_type}"
+                      card-date="${item.date}"
+                      card-site="${item.site}"
+                    ></normal-card>`;
         $("#recommend_content").append(html);
       }
       window_history();
+      if (ret.Items.length > 0) {
+        loading_data_max();
+      }
     });
+  }
+
+  // 如果没有滚动条 继续加载
+  function loading_data_max() {
+    const page_wrapper = document.querySelector(".page-wrapper");
+    if (page_wrapper && page_wrapper.scrollHeight <= page_wrapper.clientHeight) {
+      // normal_card && normal_card.length >= 20 明显的还有数据的特征 减少额外的网络请求
+      const normal_card = document.querySelectorAll("normal-card");
+      if (normal_card && normal_card.length >= 20) {
+        loading_data();
+      }
+    }
   }
 
   $(document).ready(function () {
@@ -135,6 +151,7 @@
   // 后退时sessionStorage.CurrentPage 未被清除, 则更新当前页码
   if (sessionStorage.CurrentPage) {
     CurrentPage = sessionStorage.CurrentPage;
+    loading_data_max();
   } else {
     // 否则初始化数据
     loading_data();
@@ -142,5 +159,5 @@
 
 </script>
 <script type="text/html" id="no_recommend_html">
-{{ OOPS.empty('没有媒体', '请检查TMDB API Key是否设置，以及网络是否连通。') }}
+{{ OOPS.empty('没有数据。', '') }}
 </script>

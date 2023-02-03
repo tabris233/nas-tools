@@ -18,6 +18,7 @@ class Message(object):
     messagecenter = None
     _message_schemas = []
     _active_clients = []
+    _active_interactive_clients = {}
     _client_configs = {}
     _webhook_ignore = None
     _domain = None
@@ -37,12 +38,14 @@ class Message(object):
         # 停止旧服务
         if self._active_clients:
             for active_client in self._active_clients:
-                if active_client.get("search_type") in [SearchType.TG, SearchType.SLACK]:
+                if active_client.get("search_type") in self.get_search_types():
                     client = active_client.get("client")
-                    if client:
+                    if client and hasattr(client, "stop_service"):
                         client.stop_service()
         # 活跃的客户端
         self._active_clients = []
+        # 活跃的交互客户端
+        self._active_interactive_clients = {}
         # 全量客户端配置
         self._client_configs = {}
         for client_config in self.dbhelper.get_message_client() or []:
@@ -63,11 +66,13 @@ class Message(object):
             if not client_config.ENABLED or not config:
                 continue
             client = {
-                "search_type": ModuleConf.MESSAGE_DICT.get('client').get(client_config.TYPE, {}).get('search_type'),
+                "search_type": ModuleConf.MESSAGE_CONF.get('client').get(client_config.TYPE, {}).get('search_type'),
                 "client": self.__build_class(ctype=client_config.TYPE, conf=config)
             }
             client.update(client_conf)
             self._active_clients.append(client)
+            if client.get("interactive"):
+                self._active_interactive_clients[client.get("search_type")] = client
 
     def __build_class(self, ctype, conf):
         for message_schema in self._message_schemas:
@@ -145,15 +150,15 @@ class Message(object):
         # 插入消息中心
         self.messagecenter.insert_system_message(level="INFO", title=title, content=text)
         # 发送消息
-        for client in self._active_clients:
-            if client.get("search_type") == channel:
-                state = self.__sendmsg(client=client,
-                                       title=title,
-                                       text=text,
-                                       image=image,
-                                       url=url,
-                                       user_id=user_id)
-                return state
+        client = self._active_interactive_clients.get(channel)
+        if client:
+            state = self.__sendmsg(client=client,
+                                   title=title,
+                                   text=text,
+                                   image=image,
+                                   url=url,
+                                   user_id=user_id)
+            return state
         return False
 
     def __send_list_msg(self, client, medias, user_id, title):
@@ -181,13 +186,13 @@ class Message(object):
         :param user_id: 用户ID，如有则只发给这个用户
         :return: 发送状态、错误信息
         """
-        for client in self._active_clients:
-            if client.get("search_type") == channel:
-                state = self.__send_list_msg(client=client,
-                                             title=title,
-                                             medias=medias,
-                                             user_id=user_id)
-                return state
+        client = self._active_interactive_clients.get(channel)
+        if client:
+            state = self.__send_list_msg(client=client,
+                                         title=title,
+                                         medias=medias,
+                                         user_id=user_id)
+            return state
         return False
 
     def send_download_message(self, in_from: SearchType, can_item):
@@ -358,7 +363,10 @@ class Message(object):
         if media_info.type == MediaType.MOVIE:
             return
         else:
-            msg_title = f"{media_info.get_title_string()} {media_info.get_season_string()} 已完成订阅"
+            if media_info.over_edition:
+                msg_title = f"{media_info.get_title_string()} {media_info.get_season_string()} 已完成洗版"
+            else:
+                msg_title = f"{media_info.get_title_string()} {media_info.get_season_string()} 已完成订阅"
         msg_str = f"类型：{media_info.type.value}"
         if media_info.vote_average:
             msg_str = f"{msg_str}，{media_info.get_vote_string()}"
@@ -518,16 +526,9 @@ class Message(object):
         查询当前可以交互的渠道
         """
         if client_type:
-            for client in self._active_clients:
-                if client.get("search_type") == client_type:
-                    return client
-            return None
+            return self._active_interactive_clients.get(client_type)
         else:
-            ret_clients = []
-            for client in self._active_clients:
-                if client.get('interactive'):
-                    ret_clients.append(client)
-            return ret_clients
+            return [client for client in self._active_interactive_clients.values()]
 
     @staticmethod
     def get_search_types():
@@ -535,6 +536,5 @@ class Message(object):
         查询可交互的渠道
         """
         return [info.get("search_type")
-                for info in ModuleConf.MESSAGE_DICT.get('client').values()
+                for info in ModuleConf.MESSAGE_CONF.get('client').values()
                 if info.get('search_type')]
-

@@ -37,72 +37,7 @@
   <link href="../static/css/nprogress.css" rel="stylesheet"/>
   <link href="../static/css/jsoneditor.min.css" rel="stylesheet"/>
   <!-- 附加样式 -->
-  <style>
-
-      body,
-      .page {
-        height: 100%;
-        overflow: hidden;
-      }
-
-      .tooltip-inner {
-        text-align: left;
-      }
-
-      .fileTree {
-        width: 240px;
-        max-height: 200px;
-        overflow-y: scroll;
-        overflow-x: hidden;
-        position: absolute;
-        display: none;
-      }
-
-      .jsoneditor-mode-code {
-        border: 1px solid var(--tblr-border-color) !important;
-      }
-
-      .dropzone {
-        border: 1px dashed var(--tblr-border-color) !important;
-      }
-
-      .navbar-vertical {
-        padding-top: env(safe-area-inset-top) !important;
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        top: 0 !important;
-      }
-
-      .navbar-expand-md {
-        position: fixed !important;
-        left: 0 !important;
-        right: 0 !important;
-        top: 0 !important;
-      }
-
-      @media (max-width: 992px) {
-        .navbar ul.navbar-nav {
-          overflow-y: auto;
-          max-height: 80vh;
-        }
-      }
-
-      .page-wrapper {
-        margin-top: calc(env(safe-area-inset-top) + 56px) !important;
-        height: 100% !important;
-        overflow: scroll !important;
-      }
-
-      .offcanvas {
-        padding-top: env(safe-area-inset-top) !important;
-      }
-
-      .modal-dialog {
-        padding-top: env(safe-area-inset-top) !important;
-      }
-
-  </style>
+  <link href="../static/css/style.css" rel="stylesheet"/>
   <!-- 站点图标 -->
   <style>
   {% for site_name, site_icon in SiteFavicons.items() %}
@@ -114,58 +49,82 @@
   {% endfor %}
   </style>
 </head>
-
-<body>
+{% macro usermenu() %}
+  <div class="nav-item dropdown">
+    <a href="#" class="nav-link d-flex lh-1 text-reset ms-1 p-0" data-bs-toggle="dropdown">
+        <span>
+          {{ SVG.user() }}
+        </span>
+      <div class="d-none d-xl-block ps-2">
+        <div>{{ UserName }}</div>
+      </div>
+    </a>
+    <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+      <a class="dropdown-item hide-theme-dark d-sm-none" href="?theme=dark" role="button">暗黑风格</a>
+      <a class="dropdown-item hide-theme-light d-sm-none" href="?theme=light" role="button">明亮风格</a>
+      <div class="dropdown-divider d-sm-none"></div>
+      {% if "系统设置" in UserPris %}
+        <a class="dropdown-item" data-bs-toggle="offcanvas" href="#offcanvasEnd" role="button"
+           aria-controls="offcanvasEnd">消息中心</a>
+        <a class="dropdown-item" href="javascript:show_logging_modal()" role="button">实时日志</a>
+        <div class="dropdown-divider"></div>
+        {% if SystemFlag in ['Docker', 'Synology'] %}
+          <a href="javascript:restart()" class="dropdown-item">重启</a>
+          <a href="javascript:update()" class="dropdown-item">更新</a>
+        {% endif %}
+      {% endif %}
+      <a href="javascript:logout()" class="dropdown-item">注销</a>
+    </div>
+  </div>
+{% endmacro %}
+{% macro searchbar(theme)%}
+  <div class="input-group input-group-flat {% if not theme %}me-3{% endif %}">
+    <a class="input-group-text form-control-rounded {{ theme }} ms-2" id="search_source_span_{% if theme %}theme{% endif %}"></a>
+    <input type="text" class="home_search_bar form-control form-control-rounded {{ theme }}" placeholder="搜索电影、电视剧"
+        autocomplete="new-password">
+    <span class="input-group-text form-control-rounded {{ theme }}">
+      <a href="javascript:show_search_advanced_modal()" class="link-secondary ms-2">
+        {{ SVG.adjustments() }}
+      </a>
+    </span>
+  </div>
+{% endmacro %}
+<body class="layout-fluid">
 <div class="page">
   <script src="../static/js/demo-theme.min.js"></script>
-  <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark sticky-top" style="backdrop-filter: blur(5px);">
+  <script type="text/html" id="search_source_template_tmdb">
+    <a href="javascript:change_search_source('douban')" class="link-secondary ms-2" id="search_source_tmdb{% if not theme %}theme{% endif %}">
+      <span class="text-blue">{{ SVG.square_letter_t() }}</span>
+    </a>
+  </script>
+  <script type="text/html" id="search_source_template_douban">
+    <a href="javascript:change_search_source('tmdb')" class="link-secondary ms-2" id="search_source_tmdb{% if not theme %}theme{% endif %}">
+      <span class="text-green">{{ SVG.circle_letter_d() }}</span>
+    </a>
+  </script>
+  <script type="module" src="../static/components/lit-index.js"></script>
+  <span hidden><input type="text"><input type="password"><input type="hidden" id="search_source"></span>
+  <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark sticky-top">
     <div class="container-xl">
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-auto-collapse="true"
-              data-bs-target="#navbar-menu">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <h1 class="navbar-brand" style="filter:brightness(0) invert(1)">
-        <a href="javascript:ScrollToTop()">
-          <img src="../static/img/logo-blue.png" height="48" alt="NAStool" class="navbar-brand-image">
-        </a>
-      </h1>
-      <div class="navbar-nav flex-row d-lg-none">
-        <div class="nav-item dropdown">
-          <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown">
-              <span>
-                {{ SVG.user() }}
-              </span>
-            <div class="d-none d-xl-block ps-2">
-              <div>{{ UserName }}</div>
-            </div>
+      <div class="container" style="display: flex; flex-wrap: unset; align-items: center; justify-content: center; padding: unset">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-auto-collapse="true" data-bs-target="#navbar-menu">
+          <span class="navbar-toggler-icon me-2"></span>
+        </button>
+        <h1 class="navbar-brand" style="filter:brightness(0) invert(1)">
+          <a href="javascript:ScrollToTop()" class="d-none d-lg-block">
+            <img src="../static/img/logo-blue.png" alt="NAStool" class="navbar-brand-image">
           </a>
-          <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-            <a class="dropdown-item hide-theme-dark" href="?theme=dark" role="button">暗黑风格</a>
-            <a class="dropdown-item hide-theme-light" href="?theme=light" role="button">明亮风格</a>
-            <div class="dropdown-divider"></div>
-            {% if "系统设置" in UserPris %}
-              <a class="dropdown-item" data-bs-toggle="offcanvas" href="#offcanvasEnd" role="button"
-                 aria-controls="offcanvasEnd">消息中心</a>
-              <a class="dropdown-item" href="javascript:show_logging_modal()" role="button">实时日志</a>
-              <div class="dropdown-divider"></div>
-              {% if SystemFlag in ['Docker', 'Synology'] %}
-                <a href="javascript:restart()" class="dropdown-item">重启</a>
-                <a href="javascript:update()" class="dropdown-item">更新</a>
-              {% endif %}
-            {% endif %}
-            <a href="javascript:logout()" class="dropdown-item">注销</a>
-          </div>
+        </h1>
+        {% if "资源搜索" in UserPris %}
+        <div class="flex-grow-1 d-lg-none">
+          {{ searchbar('theme-dark') }}
+        </div>
+        {% endif %}
+        <div class="navbar-nav flex-row d-lg-none">
+          {{ usermenu() }}
         </div>
       </div>
       <div class="collapse navbar-collapse" id="navbar-menu">
-        <div class="my-2 my-md-0 flex-grow-1 flex-md-grow-0 order-first order-md-last d-lg-none">
-          <div class="input-icon">
-              <span class="input-icon-addon">
-                {{ SVG.search() }}
-              </span>
-            <input type="text" value="" class="form-control theme-dark home_search_word" placeholder="搜索/订阅..." autocomplete="false">
-          </div>
-        </div>
         <ul class="navbar-nav pt-lg-3">
           {% if "我的媒体库" in UserPris %}
             <li class="nav-item">
@@ -174,7 +133,7 @@
                   {{ SVG.home() }}
                 </span>
                 <span class="nav-link-title">
-                  开始
+                  我的媒体库
                 </span>
               </a>
             </li>
@@ -198,7 +157,7 @@
                   电视剧
                 </a>
                 <a class="dropdown-item" href="javascript:void(0)" onclick="navmenu('discovery_bangumi')">
-                  Bangumi
+                  BANGUMI
                 </a>
               </div>
             </li>
@@ -388,24 +347,24 @@
     </div>
   </aside>
   <header class="navbar navbar-expand-md navbar-light d-none d-lg-flex d-print-none sticky-top">
-    <div class="container-xl">
+    <div class="container-fluid">
       <div class="navbar-nav flex-row order-md-last">
         <div class="nav-item d-none d-md-flex me-3">
           <div class="btn-list">
             <a href="https://github.com/jxxghp/nas-tools" class="btn" target="_blank" rel="noreferrer">
               {{ SVG.brand_github() }}
-              Source code
+              {{ AppVersion }}
             </a>
           </div>
         </div>
         <div class="d-none d-md-flex">
-          <a href="?theme=dark" class="nav-link px-0 hide-theme-dark" title="暗黑风格" data-bs-placement="bottom">
+          <a href="?theme=dark" class="nav-link px-0 hide-theme-dark me-2" title="暗黑风格" data-bs-placement="bottom">
             {{ SVG.moon() }}
           </a>
-          <a href="?theme=light" class="nav-link px-0 hide-theme-light" title="明亮风格" data-bs-placement="bottom">
+          <a href="?theme=light" class="nav-link px-0 hide-theme-light me-2" title="明亮风格" data-bs-placement="bottom">
             {{ SVG.sun() }}
           </a>
-          <div class="nav-item dropdown d-none d-md-flex me-3">
+          <div class="nav-item dropdown d-none d-md-flex me-2">
             <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="新版本提示"
                id="new_version_tip" style="display:none">
               {{ SVG.bell() }}
@@ -415,6 +374,13 @@
               <div class="card">
                 <div class="card-header">
                   <h3 class="card-title">新版本</h3>
+                  {% if SystemFlag in ['Docker', 'Synology'] and "系统设置" in UserPris %}
+                    <div class="ms-auto">
+                      <a href="javascript:update(NewVersion)" title="升级版本">
+                        {{ SVG.arrow_big_up_lines() }}
+                      </a>
+                    </div>
+                  {% endif %}
                 </div>
                 <div class="list-group list-group-flush list-group-hoverable">
                   <div class="list-group-item">
@@ -424,13 +390,6 @@
                         <div class="d-block text-muted text-truncate mt-n1" id="new_version_info">
                         </div>
                       </div>
-                      {% if SystemFlag in ['Docker', 'Synology'] and "系统设置" in UserPris %}
-                        <div class="col-auto">
-                          <a href="javascript:update(NewVersion)" class="list-group-item-actions" title="升级版本">
-                            {{ SVG.arrow_big_up_lines() }}
-                          </a>
-                        </div>
-                      {% endif %}
                     </div>
                   </div>
                 </div>
@@ -438,66 +397,19 @@
             </div>
           </div>
         </div>
-        <div class="nav-item dropdown">
-          <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown"
-             aria-label="Open user menu">
-              <span class="avatar avatar-sm">
-                {{ SVG.user() }}
-              </span>
-            <div class="d-none d-xl-block ps-2">
-              <div>{{ UserName }}</div>
-            </div>
-          </a>
-          <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
-            {% if "系统设置" in UserPris %}
-              <a class="dropdown-item" data-bs-toggle="offcanvas" href="#offcanvasEnd" role="button"
-                 aria-controls="offcanvasEnd">消息中心</a>
-              <a class="dropdown-item" href="javascript:show_logging_modal()" role="button">实时日志</a>
-              <div class="dropdown-divider"></div>
-              {% if SystemFlag in ['Docker', 'Synology'] %}
-                <a href="javascript:restart()" class="dropdown-item">重启</a>
-                <a href="javascript:update()" class="dropdown-item">更新</a>
-              {% endif %}
-            {% endif %}
-            <a href="javascript:logout()" class="dropdown-item">注销</a>
-          </div>
-        </div>
+        {{ usermenu() }}
       </div>
       <div class="collapse navbar-collapse">
-        <div>
-          <div class="input-icon">
-              <span class="input-icon-addon">
-                {{ SVG.search() }}
-              </span>
-            <input type="text" value="" class="form-control home_search_word" placeholder="搜索/订阅…"
-                   aria-label="资源搜索/订阅">
-          </div>
-        </div>
+        {% if "资源搜索" in UserPris %}
+          {{ searchbar() }}
+        {% endif %}
       </div>
     </div>
   </header>
-  <div class="page-wrapper" id="page_wrapper">
+  <div class="page-wrapper px-lg-2" id="page_wrapper">
     <div id="page_content">
       {{ OOPS.loading() }}
     </div>
-    <footer class="footer footer-transparent d-print-none" style="padding: 0;">
-      <div class="container-xl">
-        <div class="row text-center align-items-center flex-row-reverse">
-          <div class="col-12 col-lg-auto mt-3 mt-lg-0">
-            <ul class="list-inline list-inline-dots mb-0">
-              <li class="list-inline-item">
-                Copyright &copy; 2022
-                <a href="." class="link-secondary">NAStool</a>.
-                All rights reserved.
-              </li>
-              <li class="list-inline-item">
-                {{ AppVersion }}
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </footer>
   </div>
 </div>
 <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasEnd" aria-labelledby="消息中心">
@@ -583,13 +495,13 @@
       <div class="modal-footer">
         <div class="w-100">
           <div class="row">
-            <div class="col">
-              <a href="#" class="btn w-100" data-bs-dismiss="modal">
-                关闭
-              </a>
-            </div>
             <div class="col" id="system_success_action_div">
-              <button class="btn btn-success w-100" id="system_success_action_btn">
+              <button class="btn w-100" id="system_success_action_btn">
+                操作
+              </button>
+            </div>
+            <div class="col">
+              <button class="btn btn-success w-100" data-bs-dismiss="modal">
                 确定
               </button>
             </div>
@@ -787,16 +699,22 @@
       </div>
       <div class="modal-body">
         <div class="row">
-          <div class="col-lg-8">
+          <div class="col-lg-6">
             <div class="mb-3">
               <label class="form-label required">标题</label>
               <input type="text" value="" id="rss_name" class="form-control" placeholder="标题">
             </div>
           </div>
-          <div class="col-lg-4">
+          <div class="col-lg-2">
             <div class="mb-3">
               <label class="form-label required">年份</label>
               <input type="text" value="" id="rss_year" class="form-control" placeholder="年份">
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">自定义搜索词</label>
+              <input type="text" value="" id="rss_keyword" class="form-control" placeholder="留空使用TMDB数据">
             </div>
           </div>
         </div>
@@ -842,7 +760,7 @@
                 <input class="form-check-input" type="checkbox" id="over_edition"
                        onclick="change_over_edition_check(this)">
                 <span class="form-check-label">洗版 <span class="form-help"
-                                                          title="开启后RSS不检查媒体库是否已存在，命中即会下载"
+                                                          title="开启洗版后不会检查本地是否已存在，满足订阅条件即会下载；除非匹配了对应的过滤规则中最高优先级的那条规则否则不会删除订阅（未明确过滤规则时使用默认规则），同一优先级的资源只下载一次；多个资源下载后如命名一致，则只会保留文件体积较大的，如需都保留则需要在文件重命名规则中增加相关要素以做区分"
                                                           data-bs-toggle="tooltip">?</span></span>
               </label>
             </div>
@@ -1181,6 +1099,115 @@
     </div>
   </div>
 </div>
+<div class="modal modal-blur fade" id="modal-search-advanced" tabindex="-1" role="dialog" aria-hidden="true"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">高级搜索</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <div class="col-12 col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">类型</label>
+              <select class="form-select" id="search_type">
+                <option value="" selected>全部</option>
+                <option value="电影">电影</option>
+                <option value="电视剧">电视剧</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="mb-3">
+              <label class="form-label required">名称</label>
+              <input type="text" value="" id="search_name" class="form-control"
+                     placeholder="电影/电视剧名称">
+            </div>
+          </div>
+          <div class="col-12 col-lg-2">
+            <div class="mb-3">
+              <label class="form-label">年份</label>
+              <input type="text" value="" id="search_year" class="form-control" placeholder="20xx">
+            </div>
+          </div>
+          <div class="col-12 col-lg-2">
+            <div class="mb-3">
+              <label class="form-label">季</label>
+              <select class="form-select" id="search_season">
+                <option value="" selected>全部</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-12 col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">站点</label>
+              <select class="form-select" id="search_site">
+                <option value="" selected>全部</option>
+                {% for site in Indexers %}
+                  <option value="{{ site.name }}">{{ site.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">质量</label>
+              <select class="form-select" id="search_restype">
+                <option value="" selected>全部</option>
+                {% for Restype in RestypeDict %}
+                  <option value="{{ Restype }}">{{ Restype }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">分辨率</label>
+              <select class="form-select" id="search_pix">
+                <option value="" selected>全部</option>
+                {% for Pix in PixDict %}
+                  <option value="{{ Pix }}">{{ Pix }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="col-12 col-lg-4">
+            <div class="mb-3">
+              <label class="form-label">促销</label>
+              <select class="form-select" id="sp_state">
+                <option value="* *" selected>全部</option>
+                <option value="1.0 1.0">普通</option>
+                <option value="1.0 0.0">免费</option>
+                <option value="2.0 1.0">2X</option>
+                <option value="2.0 0.0">2X免费</option>
+                <option value="1.0 0.5">50%</option>
+                <option value="2.0 0.5">2X 50%</option>
+                <option value="1.0 0.7">70%</option>
+                <option value="1.0 0.3">30%</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-12 col-lg-8">
+            <div class="mb-3">
+              <label class="form-label">自定义</label>
+              <input type="text" value="" id="search_key" class="form-control"
+                     placeholder="自定义过滤规则">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="search_media_advanced()" id="search_advanced_btn"
+                class="btn btn-primary">开始搜索
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 <script src="../static/js/libs/list.min.js"></script>
 <script src="../static/js/jquery-3.3.1.min.js"></script>
 <script src="../static/js/tabler.min.js"></script>
@@ -1306,18 +1333,32 @@
 
 <!-- 媒体弹窗 -->
 <script type="text/javascript">
-  //显示媒体详情
-  function show_mediainfo_modal(rtype, name, year, tmdbid, page, rssid, auto_search) {
-    let doubanid;
-    if (tmdbid.startsWith("DB:")) {
-      doubanid = tmdbid.replace("DB:", "");
-      tmdbid = "";
-    } else if (isNaN(tmdbid)) {
-      doubanid = "";
-      tmdbid = "";
-    } else {
-      doubanid = "";
+
+  //搜索词条
+  function search_media_items(keyword) {
+    if (!keyword) {
+      return;
     }
+    // 刷新搜索页面
+    navmenu("recommend?type=SEARCH&title=搜索结果&subtitle=" + keyword + "&keyword=" + keyword + "&source=" + $("#search_source").val());
+  }
+
+  //搜索
+  function media_search(tmdbid, title, type) {
+    const param = {"tmdbid": tmdbid, "search_word": title, "media_type": type};
+    show_refresh_process("正在搜索 " + title + " ...");
+    ajax_post("search", param, function (ret) {
+      hide_refresh_process();
+      if (ret.code === 0) {
+        navmenu('search?s=' + title)
+      } else {
+        show_fail_modal(ret.msg);
+      }
+    }, true, false);
+  }
+
+  //显示媒体详情弹窗
+  function show_mediainfo_modal(rtype, name, year, mediaid, page, rssid) {
     if (!page) {
       page = "";
     }
@@ -1325,19 +1366,14 @@
       rssid = "";
     }
     ajax_post("media_info", {
-      "id": tmdbid,
+      "id": mediaid,
       "title": name,
       "year": year,
       "type": rtype,
-      "doubanid": doubanid,
       "page": page,
       "rssid": rssid
     }, function (ret) {
       if (ret.code === 0) {
-        if (auto_search) {
-          search_mediainfo_media(ret.tmdbid, ret.doubanid, ret.title, ret.type_str);
-          return
-        }
         //显示信息
         $("#system_media_name").text(ret.title);
         $("#system_release_date").text(ret.release_date)
@@ -1374,7 +1410,7 @@
               .show();
           //搜索按钮
           $("#system_media_search_btn").text("搜索")
-              .attr("href", 'javascript:search_mediainfo_media("' + ret.tmdbid + '", "' + ret.doubanid + '", "' + ret.title + '", "' + ret.type_str + '")')
+              .attr("href", 'javascript:search_mediainfo_media("' + ret.tmdbid + '", "' + ret.title + '", "' + ret.type_str + '")')
               .show();
           //刷新和编辑按钮
           if (ret.page.startsWith("movie_rss") || ret.page.startsWith("tv_rss")) {
@@ -1391,14 +1427,14 @@
             //详情按钮
             $("#system_media_url_btn").text("详情")
                 .attr("target", "_blank")
-                .attr("href", ret.link_url)
+                .attr("href", 'javascript:navmenu("discovery_detail?type='+ret.type+'&id='+ret.tmdbid+'")')
                 .show();
           }
         } else {
           //详情按钮
           $("#system_media_url_btn").text("详情")
               .attr("target", "_blank")
-              .attr("href", ret.link_url)
+              .attr("href", 'javascript:navmenu("discovery_detail?type='+ret.type+'&id='+ret.tmdbid+'")')
               .show();
           //订阅按钮
           $("#system_media_rss_btn").text("订阅");
@@ -1406,20 +1442,20 @@
           if (ret.seasons.length === 0) {
             $("#system_media_rss_btn").removeAttr("data-bs-toggle")
                 .removeClass("dropdown-toggle")
-                .attr("href", 'javascript:add_rss_media("' + ret.title + '","' + ret.year + '","' + ret.type + '","' + ret.tmdbid + '","' + ret.doubanid + '","' + ret.page + '","")')
+                .attr("href", 'javascript:add_rss_media("' + ret.title + '","' + ret.year + '","' + ret.type + '","' + ret.tmdbid + '","' + ret.page + '","")')
           } else {
             $("#system_media_rss_btn").prop("data-bs-toggle", "dropdown")
                 .addClass("dropdown-toggle")
                 .attr("href", 'javascript:$("#system_media_rss_btn").dropdown("toggle")')
             //订阅季的下拉框
             for (let i = 0; i < ret.seasons.length; i++) {
-              $("#system_media_rss_dropdown").append('<a class="dropdown-item" href=\'javascript:add_rss_media("' + ret.title + '","' + ret.year + '","' + ret.type + '","' + ret.tmdbid + '","' + ret.doubanid + '","' + ret.page + '","' + ret.seasons[i].num + '")\'>' + ret.seasons[i].text + '</a>');
+              $("#system_media_rss_dropdown").append('<a class="dropdown-item" href=\'javascript:add_rss_media("' + ret.title + '","' + ret.year + '","' + ret.type + '","' + ret.tmdbid + '","' + ret.page + '","' + ret.seasons[i].num + '")\'>' + ret.seasons[i].text + '</a>');
             }
           }
           $("#system_media_rss_btn").show();
           //搜索按钮
           $("#system_media_search_btn").text("搜索")
-              .attr("href", 'javascript:search_mediainfo_media("' + ret.tmdbid + '", "' + ret.doubanid + '", "' + ret.title + '", "' + ret.type_str + '")')
+              .attr("href", 'javascript:search_mediainfo_media("' + ret.tmdbid + '", "' + ret.title + '", "' + ret.type_str + '")')
               .show();
         }
         $("#system_media_name_link").attr("href", ret.link_url);
@@ -1441,14 +1477,13 @@
   }
 
   //新增订阅
-  function add_rss_media(name, year, type, tmdbid, doubanid, page, season, func) {
+  function add_rss_media(name, year, type, mediaid, page, season, func) {
     hide_mediainfo_modal();
     let data = {
       "name": name,
       "type": type,
       "year": year,
-      "doubanid": doubanid,
-      "tmdbid": tmdbid,
+      "mediaid": mediaid,
       "page": page,
       "season": season
     };
@@ -1496,31 +1531,28 @@
   }
 
   //显示订阅季选择框
-  function show_rss_seasons_modal(name, year, type, tmdbid, doubanid, seasons, func) {
+  function show_rss_seasons_modal(name, year, type, mediaid, seasons, func) {
     let system_rss_seasons_content = "";
     for (let season of seasons) {
       system_rss_seasons_content += `<label class="form-selectgroup-item">
                                       <input type="checkbox" name="system_rss_season" value="${season.num}" class="form-selectgroup-input">
                                       <span class="form-selectgroup-label">${season.text}</span>
-                                    </label>`;
+                                     </label>`;
     }
     $("#system_rss_seasons_group").empty().append(system_rss_seasons_content)
     $("#system_rss_seasons_btn").unbind('click').click(function () {
       $("#system-rss-seasons").modal('hide');
       let rss_seasons = select_GetSelectedVAL("system_rss_season");
       if (rss_seasons.length > 0) {
-        add_rss_media(name, year, type, tmdbid, doubanid, '', rss_seasons, func);
+        add_rss_media(name, year, type, mediaid, '', rss_seasons, func);
       }
     });
     $("#system-rss-seasons").modal('show');
   }
 
   //搜索
-  function search_mediainfo_media(tmdbid, doubanid, title, typestr) {
+  function search_mediainfo_media(tmdbid, title, typestr) {
     hide_mediainfo_modal();
-    if (!tmdbid && doubanid) {
-      tmdbid = "DB:" + doubanid;
-    }
     const param = {"tmdbid": tmdbid, "search_word": title, "media_type": typestr};
     show_refresh_process("正在搜索 " + title + " ...");
     ajax_post("search", param, function (ret) {
@@ -1538,10 +1570,10 @@
     const mtype = $("#rss_type").val();
     const name = $("#rss_name").val();
     const year = $("#rss_year").val();
+    const keyword = $("#rss_keyword").val();
     const season = $("#rss_season").val();
     const fuzzy_match = $("#fuzzy_match").prop("checked");
-    let doubanid;
-    let tmdbid = $("#rss_tmdbid").val();
+    const mediaid = $("#rss_tmdbid").val();
     const over_edition = $("#over_edition").prop("checked");
     const filter_restype = $("#rss_restype").val();
     const filter_pix = $("#rss_pix").val();
@@ -1582,12 +1614,6 @@
     } else {
       $("#rss_current_ep").removeClass("is-invalid");
     }
-    if (tmdbid && tmdbid.startsWith("DB:")) {
-      doubanid = tmdbid.replace("DB:", "");
-      tmdbid = "";
-    } else {
-      doubanid = "";
-    }
     //订阅站点
     let rss_sites = select_GetSelectedVAL("rss_sites");
     if (rss_sites.length === RSS_SITES_LENGTH) {
@@ -1623,12 +1649,12 @@
       "year": year,
       "season": season,
       "fuzzy_match": fuzzy_match,
-      "doubanid": doubanid,
-      "tmdbid": tmdbid,
+      "mediaid": mediaid,
       "over_edition": over_edition,
       "total_ep": total_ep,
       "current_ep": current_ep,
       "rssid": rssid,
+      "keyword": keyword
     }, ...rss_setting};
     $("#modal-manual-rss").modal("hide");
     ajax_post("add_rss_media", data, function (ret) {
@@ -1655,7 +1681,7 @@
 
   //初始化下拉框
   let rss_season_content = `<option value="">请选择</option>`;
-  for (let i = 1; i <= 50; i++) {
+  for (let i = 0; i <= 50; i++) {
     rss_season_content += `<option value="${i}">第${i}季</option>`;
   }
   $("#rss_season").empty().append(rss_season_content);
@@ -1701,6 +1727,7 @@
     $("#rss_modal_title").text("新增订阅");
     $("#rss_name").val("").attr("readonly", false);
     $("#rss_year").val("").attr("readonly", false);
+    $("#rss_keyword").val("");
     $("#rss_tmdbid").val("");
     $("#fuzzy_match").prop("checked", false);
     $("#over_edition").prop("checked", false);
@@ -1719,15 +1746,23 @@
     }
     if (rss_setting) {
       rss_setting = JSON.parse(rss_setting);
-      console.log(rss_setting);
       $("#rss_restype").val(rss_setting.filter_restype);
       $("#rss_pix").val(rss_setting.filter_pix);
       $("#rss_team").val(rss_setting.filter_team);
       $("#rss_rule").val(rss_setting.filter_rule);
-      $("#rss_save_path").val(rss_setting.save_path);
       $("#rss_download_setting").val(rss_setting.download_setting);
-      select_SelectPart(rss_setting.search_sites, 'search_sites');
-      select_SelectPart(rss_setting.rss_sites, 'rss_sites');
+      refresh_savepath_select('rss_save_path', false, rss_setting.download_setting)
+      $("#rss_save_path").val(rss_setting.save_path);
+      if (rss_setting.search_sites.length === 0) {
+        select_SelectALL(true, 'search_sites')
+      } else {
+        select_SelectPart(rss_setting.search_sites, 'search_sites');
+      }
+      if (rss_setting.rss_sites.length === 0) {
+        select_SelectALL(true, 'rss_sites')
+      } else {
+        select_SelectPart(rss_setting.rss_sites, 'rss_sites');
+      }
     } else {
       $("#rss_restype").val('');
       $("#rss_pix").val('');
@@ -1760,6 +1795,7 @@
         $("#rss_tmdbid").val(ret.detail.tmdbid);
         $("#rss_name").val(ret.detail.name).attr("readonly", true);
         $("#rss_year").val(ret.detail.year).attr("readonly", true);
+        $("#rss_keyword").val(ret.detail.keyword);
         if (type == "MOV" || type == "电影") {
           $("#rss_tv_season_div").hide();
           $("#rss_season").val("");
@@ -1799,8 +1835,9 @@
         $("#rss_pix").val(ret.detail.filter_pix);
         $("#rss_team").val(ret.detail.filter_team);
         $("#rss_rule").val(ret.detail.filter_rule);
-        $("#rss_save_path").val(ret.detail.save_path);
         $("#rss_download_setting").val(ret.detail.download_setting);
+        refresh_savepath_select('rss_save_path', false, ret.detail.download_setting)
+        $("#rss_save_path").val(ret.detail.save_path);
         if (ret.detail.rss_sites.length === 0) {
           select_SelectALL(true, 'rss_sites');
         } else {
@@ -1854,7 +1891,7 @@
 
   // 刷新订阅站点列表
   var RSS_SITES_LENGTH = 0;
-  function refresh_rsssites_select(obj_id, aync = true) {
+  function refresh_rsssites_select(obj_id, item_name,aync = true) {
     ajax_post("get_sites", {rss: true, basic: true}, function (ret) {
       if (ret.code === 0) {
         let rsssites_select = $(`#${obj_id}`);
@@ -1868,7 +1905,7 @@
         for (let site of ret.sites) {
           rsssites_select_content += `
           <label class="form-selectgroup-item">
-            <input type="checkbox" name="rss_sites" value="${site.name}" class="form-selectgroup-input">
+            <input type="checkbox" name="${item_name}" value="${site.name}" class="form-selectgroup-input">
             <span class="form-selectgroup-label">${site.name}</span>
           </label>`;
         }
@@ -1879,7 +1916,7 @@
 
   // 刷新搜索站点列表
   var SEARCH_SITES_LENGTH = 0;
-  function refresh_searchsites_select(obj_id, aync = true) {
+  function refresh_searchsites_select(obj_id, item_name,aync = true) {
     ajax_post("get_indexers", {check: true, basic: true}, function (ret) {
       if (ret.code === 0) {
         let searchsites_select = $(`#${obj_id}`);
@@ -1893,7 +1930,7 @@
         for (let indexer of ret.indexers) {
           searchsites_select_content += `
           <label class="form-selectgroup-item">
-            <input type="checkbox" name="search_sites" value="${indexer.name}" class="form-selectgroup-input">
+            <input type="checkbox" name="${item_name}" value="${indexer.name}" class="form-selectgroup-input">
             <span class="form-selectgroup-label">${indexer.name}</span>
           </label>`;
         }
@@ -1903,25 +1940,30 @@
   }
 
   // 刷新保存路径
-  function refresh_savepath_select(obj_id, aync = true, sid = "") {
-    ajax_post("get_download_dirs", {sid: sid}, function (ret) {
-      if (ret.code === 0) {
-        let savepath_select = $(`#${obj_id}`);
-        let savepath_select_content = `<option value="" selected>自动</option>`;
-        for (let path of ret.paths) {
-          savepath_select_content += `<option value="${path}">${path}</option>`;
+  function refresh_savepath_select(obj_id, aync = true, sid = "", is_default = false, site="") {
+    let savepath_select = $(`#${obj_id}`);
+    if (!sid && !is_default && !site) {
+      savepath_select.empty().append(`<option value="" selected>自动</option>`);
+    } else {
+      ajax_post("get_download_dirs", {sid: sid, site: site}, function (ret) {
+        if (ret.code === 0) {
+          let savepath_select_content = `<option value="" selected>自动</option>`;
+          for (let path of ret.paths) {
+            savepath_select_content += `<option value="${path}">${path}</option>`;
+          }
+          savepath_select.empty().append(savepath_select_content);
         }
-        savepath_select.empty().append(savepath_select_content);
-      }
-    }, aync);
+      }, aync);
+    }
   }
 
   // 刷新下载设置
-  function refresh_downloadsetting_select(obj_id, aync = true) {
+  function refresh_downloadsetting_select(obj_id, aync = true, is_default = false) {
+    let default_content = (!is_default) ? "站点设置" : "默认";
     ajax_post("get_download_setting", {}, function (ret) {
       if (ret.code === 0) {
         let downloadsetting_select = $(`#${obj_id}`);
-        let downloadsetting_select_content = `<option value="" selected>默认</option>`;
+        let downloadsetting_select_content = `<option value="" selected>${default_content}</option>`;
         for (let downloadsetting of ret.data) {
           downloadsetting_select_content += `<option value="${downloadsetting.id}">${downloadsetting.name}</option>`;
         }
@@ -1932,26 +1974,37 @@
 
   // 刷新订阅框的下载设置及目录等选项
   function refresh_rss_download_setting_dirs(){
-    refresh_rsssites_select("rss_sites_group", false);
-    refresh_searchsites_select("rss_search_sites_group", false);
+    refresh_rsssites_select("rss_sites_group", "rss_sites", false);
+    refresh_searchsites_select("rss_search_sites_group", "search_sites", false);
     refresh_filter_select("rss_rule", false);
     refresh_downloadsetting_select("rss_download_setting", false);
     refresh_savepath_select("rss_save_path", false, $("#rss_download_setting").val());
   }
 
   // 刷新下载框的下载设置及目录选项
-  function refresh_search_download_setting_dirs(){
-    refresh_downloadsetting_select("search_download_setting", false);
-    refresh_savepath_select("search_download_dir", true, $("#search_download_setting").val());
+  function refresh_search_download_setting_dirs(is_default, site=""){
+    refresh_downloadsetting_select("search_download_setting", false, is_default);
+    refresh_savepath_select("search_download_dir", true, $("#search_download_setting").val(), is_default, site);
   }
 
   // 显示下载提示框
-  function show_download_modal(id, name, func=undefined, show_type=undefined) {
+  function show_download_modal(id, name, site=undefined, func=undefined, show_type=undefined) {
     $("#search_download_id").val(id);
     $("#search_download_name").val(name);
     $("#search_download_message").text(`新增下载 ${name}`);
     // 根据下载设置刷新下载目录选项
-    refresh_search_download_setting_dirs();
+    // 正在下载页面新增下载添加默认而非站点设置
+    if (show_type) {
+      refresh_search_download_setting_dirs(true);
+      $("#search_download_setting").attr("onchange", "refresh_savepath_select('search_download_dir', true, $(this).val(), true)")
+    } else if (site) {
+      refresh_search_download_setting_dirs(false, site);
+      $("#search_download_setting").attr("onchange", `refresh_savepath_select('search_download_dir', true, $(this).val(), false, "${site}")`)
+    } else {
+      refresh_search_download_setting_dirs(false);
+      $("#search_download_setting").attr("onchange", "refresh_savepath_select('search_download_dir', true, $(this).val(), false)")
+    }
+
     // 绑定下载按钮事件
     if (func) {
       $("#search_download_btn").unbind("click").click(func);
@@ -1961,10 +2014,10 @@
     // 清空
     torrent_dropzone.removeAllFiles();
     $("#torrent_magnets").val("");
-    if (show_type == 'torrent') {
+    if (show_type === 'torrent') {
       $("#torrent_files").show();
       $("#torrent_magnets").hide();
-    } else if (show_type == 'magnet') {
+    } else if (show_type === 'magnet') {
       $("#torrent_magnets").show();
       $("#torrent_files").hide();
     } else {
@@ -1988,6 +2041,65 @@
         show_fail_modal(`${name} 添加下载失败 ${ret.retmsg}！`);
       }
     });
+  }
+
+  // 显示高级搜索框
+  function show_search_advanced_modal() {
+    $("#modal-search-advanced").modal("show");
+  }
+
+  // 开始高级搜索
+  function search_media_advanced() {
+    let keyword;
+    $("#search_icon").attr("disabled", "true");
+    // 读取数据
+    const search_name = $("#search_name").val();
+    if (!search_name) {
+      $("#search_name").addClass("is-invalid");
+      return;
+    } else {
+      $("#search_name").removeClass("is-invalid");
+    }
+    const search_type = $("#search_type").val();
+    const search_season = $("#search_season").val();
+    const search_year = $("#search_year").val();
+    const search_site = $("#search_site").val();
+    const search_restype = $("#search_restype").val();
+    const search_pix = $("#search_pix").val();
+    const sp_state = $("#sp_state").val();
+    const search_key = $("#search_key").val();
+    // 拼装请求
+    if (search_type) {
+      keyword = search_type + " " + search_name;
+    } else {
+      keyword = search_name;
+    }
+    if (search_year) {
+      keyword = keyword + " " + search_year;
+    }
+    if (search_season) {
+      keyword = keyword + " " + search_season;
+    }
+    const filters = {
+      "site": search_site,
+      "restype": search_restype,
+      "pix": search_pix,
+      "sp_state": sp_state,
+      "key": search_key
+    };
+    const param = {"search_word": keyword, "filters": filters, "unident": true};
+    $("#modal-search-advanced").modal("hide");
+    show_refresh_process(`正在搜索 ${keyword} ...`);
+    ajax_post("search", param, function (ret) {
+      hide_refresh_process();
+      if (ret.code === 0) {
+        navmenu(`search?s=${keyword}`);
+      } else {
+        show_fail_modal(ret.msg,function () {
+          $("#modal-search-advanced").modal("show");
+        });
+      }
+    }, true, false);
   }
 
 </script>
@@ -2135,12 +2247,7 @@
       $("#unknown_id").val(unknown_id);
       $("#transferlog_id").val(transferlog_id);
     }
-    // 初始化季列表
-    let rename_season_content = `<option value="" selected>请选择</option>`;
-    for (let i = 0; i <= 50; i++) {
-      rename_season_content += `<option value="${i}">第${i}季</option>`;
-    }
-    $("#rename_season").empty().append(rename_season_content);
+
     // 初始化媒体类型
     if (media_type === "电视剧") {
       $("#rename_type_tv").prop("checked", true);
@@ -2278,18 +2385,12 @@
       "path": path,
       "logid": logid
     };
-    $("#identification_action_btn").attr("disabled", true)
-        .text("处理中...");
+    $("#identification_action_btn").attr("disabled", true).text("处理中...");
     $("#rename_udf_retmsg").hide()
     $("#rename_retmsg").hide()
-    if (manual_type == '3') {
-      cmd = "rename_udf"
-    } else {
-      cmd = "rename"
-    }
+    let cmd = (manual_type === '3') ? "rename_udf" : "rename"
     ajax_post(cmd, data, function (ret) {
-      $("#identification_action_btn").attr("disabled", false)
-          .text("转移");
+      $("#identification_action_btn").attr("disabled", false).text("转移");
       if (ret.retcode === 0) {
         $('#modal-media-identification').modal('hide');
         show_success_modal("处理成功！", function () {
@@ -2353,6 +2454,31 @@
     });
   }
 
+  //切换搜索源
+  function change_search_source(search_source) {
+    let input_obj = $('#search_source');
+    input_obj.val(search_source);
+    let html = $(`#search_source_template_${search_source}`).text();
+    localStorage.setItem("SearchSource", search_source);
+    $("[id^=search_source_span_]").each(function(){
+      $(this).empty().append(html);
+    });
+  }
+
+  //初始化季列表
+  function init_season_list() {
+    let rename_season_content = `<option value="" selected>请选择</option>`;
+    let search_season_content = `<option value="" selected>全部</option>`;
+    for (let i = 0; i <= 50; i++) {
+      rename_season_content += `<option value="${i}">第${i}季</option>`;
+      if (i > 0) {
+        search_season_content += `<option value="${i}">第${i}季</option>`;
+      }
+    }
+    $("#rename_season").empty().append(rename_season_content);
+    $("#search_season").empty().append(search_season_content);
+  }
+
 </script>
 
 <!-- 首页功能 -->
@@ -2366,17 +2492,22 @@
     }
   }
 
-  function window_history(newflag=false){
+  function window_history(newflag=false, extra=undefined){
     const state = {
       title: document.title,
       html: $("#page_content").html(),         // 页面内容
       scroll: $("#page_wrapper").scrollTop(),  // 页面滚动位置
       CurrentPage: sessionStorage.CurrentPage, // 页面当前页码
       page: CURRENT_PAGE_URI,                  // 当前页面地址
+      extra: extra,                            // 额外的保存数据
     };
     if (newflag) {
       window.history.pushState(state, "");
     } else {
+      // 当未传递extra时的页面缓存刷新, 应当重新保留extra数据
+      if (!extra && window.history.state?.extra) {
+        state.extra = window.history.state.extra;
+      }
       window.history.replaceState(state, "");
     }
   }
@@ -2441,8 +2572,7 @@
         let log_list = ret.loglist;
         let tdstyle = "padding-top: 0.5rem; padding-bottom: 0.5rem";
         let tbody = "";
-        for (let i = 0; i < log_list.length; i++) {
-          const log =  log_list[i];
+        for (let log of log_list) {
           let text = log.text;
           const source = log.source;
           const time = log.time;
@@ -2477,18 +2607,19 @@
                     <td style="${tdstyle}"><span class="${tcolor}" style="${tstyle}">${text}</span></td>
                     </tr>`;
         }
-        let bool_ToScrolTop = ($("#logging_table").scrollTop() + $("#logging_table").prop("offsetHeight")) >= $("#logging_table").prop("scrollHeight");
+        let logging_table_obj = $("#logging_table");
+        let bool_ToScrolTop = (logging_table_obj.scrollTop() + logging_table_obj.prop("offsetHeight")) >= logging_table_obj.prop("scrollHeight");
         $("#logging_content").append(tbody);
         if (bool_ToScrolTop){
           setTimeout(function () {
-            $("#logging_table").scrollTop($("#logging_table").prop("scrollHeight"));
+            logging_table_obj.scrollTop(logging_table_obj.prop("scrollHeight"));
           }, 500);
         }
       }
       if ($("#modal-logging").is(":hidden") && flag) {
         stop_logging();
       }
-      if (refresh_logging_flag == true) {
+      if (refresh_logging_flag === true) {
         setTimeout("refresh_logging(true)", 2000);
       }
     }, true, false);
@@ -2496,7 +2627,7 @@
 
   //暂停实时日志
   function pause_logging() {
-    if (refresh_logging_flag == true) {
+    if (refresh_logging_flag === true) {
       stop_logging();
       $("#logging_stop_btn").text("开始")
     } else {
@@ -2535,17 +2666,25 @@
   }
 
   // 检查新版本
-  const AppVersion = "{{ AppVersion }}".split(" ")[0];
   let NewVersion = '';
   $("#new_version_tip").hide();
 
   function check_new_version() {
     ajax_post("version", {}, function (ret) {
       if (ret.code === 0) {
-        if (compareVersion(ret.version, AppVersion) > 0) {
-          $("#new_version_info").html(ret.info);
-          $("#new_version_tip").show();
+        let url = null;
+        switch (compareVersion(ret.version, "{{ AppVersion }}")) {
+          case 1:
+            url = ret.url;
+            break;
+          case 2:
+            url = "https://github.com/jxxghp/nas-tools/commits/master"
+            break;
+        }
+        if (url) {
           NewVersion = ret.version;
+          $("#new_version_info").html(`<a href="${url}" target="_blank">${ret.version}</a>`);
+          $("#new_version_tip").show();
         }
       }
     });
@@ -2603,6 +2742,7 @@
       scrollTop: 0
     }, 500);
   }
+
 </script>
 
 <!-- 事件  -->
@@ -2631,20 +2771,10 @@
           $("#navbar-menu").collapse('hide');
           $(".page-wrapper").unbind('scroll');
           document.title = e.state.title;
-          $('#page_content').html(e.state.html);
-          $("#page_wrapper").scrollTop(e.state.scroll);
+          $('#page_content').html(e.state.html).ready(function() {
+            $("#page_wrapper").scrollTop(e.state.scroll);
+          })
         }
-    });
-
-    // 搜索输入框
-    $('.home_search_word').bind('keypress', function (event) {
-      if (event.keyCode == "13") {
-        if (!$(this).val()) {
-          return;
-        }
-        navmenu('medialist?s=' + $(this).val() + '&f=1');
-        $(this).val('');
-      }
     });
 
     // tooltip点击事件处理，阻止冒泡到上级元素，避免比如`点击tooltip切换了switch`的问题
@@ -2652,6 +2782,14 @@
       e.preventDefault();
       e.stopPropagation();
     });
+
+    // 搜索框回车事件
+    $('.home_search_bar').on('keypress', function (e) {
+       if(e.which === 13){
+         search_media_items($(this).val());
+         $(this).val('');
+       }
+   });
 
     /**
      * 计算菜单列表高度
@@ -2676,6 +2814,12 @@
     }
     // 更新菜单高度
     updateMenuListHeight()
+
+    // 初始化搜索源
+    change_search_source(localStorage.getItem("SearchSource") ?? "{{ SearchSource }}");
+
+    // 初始化季列表
+    init_season_list();
 
     // 初始化DropZone
     torrent_dropzone = new Dropzone("#torrent_files");

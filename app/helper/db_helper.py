@@ -553,17 +553,19 @@ class DbHelper:
         )
 
     @DbPersist(_db)
-    def update_site_cookie_ua(self, tid, cookie, ua):
+    def update_site_cookie_ua(self, tid, cookie, ua=None):
         """
         更新站点Cookie和ua
         """
         if not tid:
             return
         rec = self._db.query(CONFIGSITE).filter(CONFIGSITE.ID == int(tid)).first()
-        if not rec.NOTE:
-            return
-        note = json.loads(rec.NOTE)
-        note['ua'] = ua
+        if rec.NOTE:
+            note = json.loads(rec.NOTE)
+            if ua:
+                note['ua'] = ua
+        else:
+            note = {}
         self._db.query(CONFIGSITE).filter(CONFIGSITE.ID == int(tid)).update(
             {
                 "COOKIE": cookie,
@@ -605,21 +607,30 @@ class DbHelper:
             else:
                 return self._db.query(RSSMOVIES).filter(RSSMOVIES.STATE == state).all()
 
-    def get_rss_movie_id(self, title, tmdbid=None):
+    def get_rss_movie_id(self, title, year=None, tmdbid=None):
         """
         获取订阅电影ID
         """
         if not title:
             return ""
-        ret = self._db.query(RSSMOVIES.ID).filter(RSSMOVIES.NAME == title).first()
-        if ret:
-            return ret[0]
+        if tmdbid:
+            ret = self._db.query(RSSMOVIES.ID).filter(RSSMOVIES.TMDBID == str(tmdbid)).first()
+            if ret:
+                return ret[0]
+        if not year:
+            items = self._db.query(RSSMOVIES).filter(RSSMOVIES.NAME == title).all()
         else:
+            items = self._db.query(RSSMOVIES).filter(RSSMOVIES.NAME == title,
+                                                     RSSMOVIES.YEAR == str(year)).all()
+        if items:
             if tmdbid:
-                ret = self._db.query(RSSMOVIES.ID).filter(RSSMOVIES.TMDBID == tmdbid).first()
-                if ret:
-                    return ret[0]
-        return ""
+                for item in items:
+                    if not item.TMDBID or item.TMDBID == str(tmdbid):
+                        return item.ID
+            else:
+                return items[0].ID
+        else:
+            return ""
 
     def get_rss_movie_sites(self, rssid):
         """
@@ -657,6 +668,33 @@ class DbHelper:
             "DESC": desc
         })
 
+    @DbPersist(_db)
+    def update_rss_filter_order(self, rtype, rssid, res_order):
+        """
+        更新订阅命中的过滤规则优先级
+        """
+        if rtype == MediaType.MOVIE:
+            self._db.query(RSSMOVIES).filter(RSSMOVIES.ID == int(rssid)).update({
+                "FILTER_ORDER": res_order
+            })
+        else:
+            self._db.query(RSSTVS).filter(RSSTVS.ID == int(rssid)).update({
+                "FILTER_ORDER": res_order
+            })
+
+    def get_rss_overedition_order(self, rtype, rssid):
+        """
+        查询当前订阅的过滤优先级
+        """
+        if rtype == MediaType.MOVIE:
+            res = self._db.query(RSSMOVIES.FILTER_ORDER).filter(RSSMOVIES.ID == int(rssid)).first()
+        else:
+            res = self._db.query(RSSTVS.FILTER_ORDER).filter(RSSTVS.ID == int(rssid)).first()
+        if res and res[0]:
+            return int(res[0])
+        else:
+            return 0
+
     def is_exists_rss_movie(self, title, year):
         """
         判断RSS电影是否存在
@@ -684,7 +722,8 @@ class DbHelper:
                          download_setting=-1,
                          fuzzy_match=0,
                          desc=None,
-                         note=None):
+                         note=None,
+                         keyword=None):
         """
         新增RSS电影
         """
@@ -715,7 +754,8 @@ class DbHelper:
             FUZZY_MATCH=fuzzy_match,
             STATE=state,
             DESC=desc,
-            NOTE=note
+            NOTE=note,
+            KEYWORD=keyword
         ))
         return 0
 
@@ -747,9 +787,8 @@ class DbHelper:
                     "STATE": state
                 })
         else:
-            self._db.query(RSSMOVIES).filter(
-                RSSMOVIES.NAME == title,
-                RSSMOVIES.YEAR == str(year)).update(
+            self._db.query(RSSMOVIES).filter(RSSMOVIES.NAME == title,
+                                             RSSMOVIES.YEAR == str(year)).update(
                 {
                     "STATE": state
                 })
@@ -766,33 +805,41 @@ class DbHelper:
             else:
                 return self._db.query(RSSTVS).filter(RSSTVS.STATE == state).all()
 
-    def get_rss_tv_id(self, title, season=None, tmdbid=None):
+    def get_rss_tv_id(self, title, year=None, season=None, tmdbid=None):
         """
-        获取订阅电影ID
+        获取订阅电视剧ID
         """
         if not title:
             return ""
-        if season:
-            ret = self._db.query(RSSTVS.ID).filter(RSSTVS.NAME == title,
-                                                   RSSTVS.SEASON == season).first()
+        if tmdbid:
+            if season:
+                ret = self._db.query(RSSTVS.ID).filter(RSSTVS.TMDBID == tmdbid,
+                                                       RSSTVS.SEASON == season).first()
+            else:
+                ret = self._db.query(RSSTVS.ID).filter(RSSTVS.TMDBID == tmdbid).first()
             if ret:
                 return ret[0]
-            else:
-                if tmdbid:
-                    ret = self._db.query(RSSTVS.ID).filter(RSSTVS.TMDBID == tmdbid,
-                                                           RSSTVS.SEASON == season).first()
-                    if ret:
-                        return ret[0]
+        if season and year:
+            items = self._db.query(RSSTVS).filter(RSSTVS.NAME == title,
+                                                  RSSTVS.SEASON == str(season),
+                                                  RSSTVS.YEAR == str(year)).all()
+        elif season and not year:
+            items = self._db.query(RSSTVS).filter(RSSTVS.NAME == title,
+                                                  RSSTVS.SEASON == str(season)).all()
+        elif not season and year:
+            items = self._db.query(RSSTVS).filter(RSSTVS.NAME == title,
+                                                  RSSTVS.YEAR == str(year)).all()
         else:
-            ret = self._db.query(RSSTVS.ID).filter(RSSTVS.NAME == title).first()
-            if ret:
-                return ret[0]
+            items = self._db.query(RSSTVS).filter(RSSTVS.NAME == title).all()
+        if items:
+            if tmdbid:
+                for item in items:
+                    if not item.TMDBID or item.TMDBID == str(tmdbid):
+                        return item.ID
             else:
-                if tmdbid:
-                    ret = self._db.query(RSSTVS.ID).filter(RSSTVS.TMDBID == tmdbid).first()
-                    if ret:
-                        return ret[0]
-        return ""
+                return items[0].ID
+        else:
+            return ""
 
     def get_rss_tv_sites(self, rssid):
         """
@@ -873,7 +920,8 @@ class DbHelper:
                       current_ep=None,
                       fuzzy_match=0,
                       desc=None,
-                      note=None):
+                      note=None,
+                      keyword=None):
         """
         新增RSS电视剧
         """
@@ -913,7 +961,8 @@ class DbHelper:
             LACK=lack,
             STATE=state,
             DESC=desc,
-            NOTE=note
+            NOTE=note,
+            KEYWORD=keyword
         ))
         return 0
 
@@ -1885,7 +1934,7 @@ class DbHelper:
             return
         self._db.query(CONFIGUSERRSS).filter(CONFIGUSERRSS.ID == int(tid)).update(
             {
-                "PROCESS_COUNT": str(int(CONFIGUSERRSS.PROCESS_COUNT or 0) + count),
+                "PROCESS_COUNT": CONFIGUSERRSS.PROCESS_COUNT + count,
                 "UPDATE_TIME": time.strftime('%Y-%m-%d %H:%M:%S',
                                              time.localtime(time.time()))
             }
@@ -1903,13 +1952,15 @@ class DbHelper:
                     "USES": item.get("uses"),
                     "INCLUDE": item.get("include"),
                     "EXCLUDE": item.get("exclude"),
-                    "FILTER": item.get("filterrule"),
-                    "UPDATE_TIME": time.strftime('%Y-%m-%d %H:%M:%S',
-                                                 time.localtime(time.time())),
+                    "FILTER": item.get("filter_rule"),
+                    "UPDATE_TIME": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
                     "STATE": item.get("state"),
                     "SAVE_PATH": item.get("save_path"),
                     "DOWNLOAD_SETTING": item.get("download_setting"),
                     "RECOGNIZATION": item.get("recognization"),
+                    "OVER_EDITION": int(item.get("over_edition")) if str(item.get("over_edition")).isdigit() else 0,
+                    "SITES": json.dumps(item.get("sites")),
+                    "FILTER_ARGS": json.dumps(item.get("filter_args")),
                     "NOTE": ""
                 }
             )
@@ -1922,16 +1973,19 @@ class DbHelper:
                 USES=item.get("uses"),
                 INCLUDE=item.get("include"),
                 EXCLUDE=item.get("exclude"),
-                FILTER=item.get("filterrule"),
-                UPDATE_TIME=time.strftime('%Y-%m-%d %H:%M:%S',
-                                          time.localtime(time.time())),
+                FILTER=item.get("filter_rule"),
+                UPDATE_TIME=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time())),
                 STATE=item.get("state"),
                 SAVE_PATH=item.get("save_path"),
                 DOWNLOAD_SETTING=item.get("download_setting"),
                 RECOGNIZATION=item.get("recognization"),
+                OVER_EDITION=item.get("over_edition"),
+                SITES=json.dumps(item.get("sites")),
+                FILTER_ARGS=json.dumps(item.get("filter_args")),
                 PROCESS_COUNT='0'
             ))
 
+    @DbPersist(_db)
     def insert_userrss_mediainfos(self, tid=None, mediainfo=None):
         if not tid or not mediainfo:
             return

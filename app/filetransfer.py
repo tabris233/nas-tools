@@ -118,13 +118,17 @@ class FileTransfer:
                 self._min_filesize = min_filesize * 1024 * 1024
             elif isinstance(min_filesize, str) and min_filesize.isdigit():
                 self._min_filesize = int(min_filesize) * 1024 * 1024
-            # 转移文件夹黑名单
+            # 文件路径转移忽略词
             ignored_paths = media.get('ignored_paths')
             if ignored_paths:
-                self._ignored_paths = ignored_paths.split(';')
-            # 文件转移忽略词
+                if ignored_paths.endswith(";"):
+                    ignored_paths = ignored_paths[:-1]
+                self._ignored_paths = re.compile(r'%s' % re.sub(r';', r'|', ignored_paths))
+            # 文件名转移忽略词
             ignored_files = media.get('ignored_files')
             if ignored_files:
+                if ignored_files.endswith(";"):
+                    ignored_files = ignored_files[:-1]
                 self._ignored_files = re.compile(r'%s' % re.sub(r';', r'|', ignored_files))
             # 高质量文件覆盖
             self._filesize_cover = media.get('filesize_cover')
@@ -143,7 +147,8 @@ class FileTransfer:
                 if len(tv_formats) > 2:
                     self._tv_season_rmt_format = tv_formats[-2]
                     self._tv_file_rmt_format = tv_formats[-1]
-        self._default_rmt_mode = ModuleConf.RMT_MODES.get(Config().get_config('pt').get('rmt_mode', 'copy'), RmtMode.COPY)
+        self._default_rmt_mode = ModuleConf.RMT_MODES.get(Config().get_config('pt').get('rmt_mode', 'copy'),
+                                                          RmtMode.COPY)
 
     @staticmethod
     def __transfer_command(file_item, target_file, rmt_mode):
@@ -430,7 +435,8 @@ class FileTransfer:
                        season=None,
                        episode: (EpisodeFormat, bool) = None,
                        min_filesize=None,
-                       udf_flag=False):
+                       udf_flag=False,
+                       root_path=False):
         """
         识别并转移一个文件、多个文件或者目录
         :param in_from: 来源，即调用该功能的渠道
@@ -445,6 +451,7 @@ class FileTransfer:
         :param episode: (EpisodeFormat，是否批处理匹配)
         :param min_filesize: 过滤小文件大小的上限值
         :param udf_flag: 自定义转移标志，为True时代表是自定义转移，此时很多处理不一样
+        :param root_path: 是否根目录下的文件
         :return: 处理状态，错误信息
         """
         episode = (None, False) if not episode else episode
@@ -807,6 +814,7 @@ class FileTransfer:
             if rmt_mode == RmtMode.MOVE \
                     and os.path.exists(in_path) \
                     and os.path.isdir(in_path) \
+                    and not root_path \
                     and not PathUtils.get_dir_files(in_path=in_path, exts=RMT_MEDIAEXT) \
                     and not PathUtils.get_dir_files(in_path=in_path, exts=['.!qb', '.part']):
                 log.info("【Rmt】目录下已无媒体文件及正在下载的文件，移动模式下删除目录：%s" % in_path)
@@ -1179,39 +1187,77 @@ class FileTransfer:
         """
         if not file_list:
             return [], ""
-        #  过滤掉文件列表中上级文件夹在黑名单中的
+        #  过滤掉文件列表中文件路径包含文件路径转移忽略词的
         if self._ignored_paths:
             try:
                 for file in file_list[:]:
-                    if file.replace('\\', '/').split('/')[-2] in self._ignored_paths:
-                        log.info("【Rmt】%s 文件上级文件夹名称在黑名单中，已忽略转移" % file)
+                    if re.findall(self._ignored_paths, os.path.dirname(file)):
+                        log.info(f"【Rmt】{file} 文件路径含转移忽略词，已忽略转移")
                         file_list.remove(file)
                 if not file_list:
-                    return [], "排除转移文件夹黑名单后，没有新文件需要处理"
+                    return [], "排除文件路径转移忽略词后，没有新文件需要处理"
             except Exception as err:
                 ExceptionUtils.exception_traceback(err)
-                log.error("【Rmt】转移文件夹黑名单设置有误：%s" % str(err))
+                log.error("【Rmt】文件路径转移忽略词设置有误：%s" % str(err))
 
-        #  过滤掉文件列表中包含文件转移忽略词的
+        #  过滤掉文件列表中文件名包含文件名转移忽略词的
         if self._ignored_files:
             try:
                 for file in file_list[:]:
-                    if re.findall(self._ignored_files, file.replace('\\', '/').split('/')[-1]):
-                        log.info("【Rmt】%s 文件名包含文件转移忽略词，已忽略转移" % file)
+                    if re.findall(self._ignored_files, os.path.basename(file)):
+                        log.info(f"【Rmt】{file} 文件名包含转移忽略词，已忽略转移")
                         file_list.remove(file)
                 if not file_list:
-                    return [], "排除文件转移忽略词后，没有新文件需要处理"
+                    return [], "排除文件名转移忽略词后，没有新文件需要处理"
             except Exception as err:
                 ExceptionUtils.exception_traceback(err)
-                log.error("【Rmt】文件转移忽略词设置有误：%s" % str(err))
+                log.error("【Rmt】文件名转移忽略词设置有误：%s" % str(err))
 
         return file_list, ""
+
+    def get_media_exists_flag(self, mtype, title, year, mediaid):
+        """
+        获取媒体存在标记：是否存在、是否订阅
+        :param: mtype 媒体类型
+        :param: title 媒体标题
+        :param: year 媒体年份
+        :param: mediaid TMDBID/DB:豆瓣ID/BG:Bangumi的ID
+        :return: 1-已订阅/2-已下载/0-不存在未订阅, RSSID
+        """
+        if str(mediaid).isdigit():
+            tmdbid = mediaid
+        else:
+            tmdbid = None
+        if mtype in ["MOV", "电影", MediaType.MOVIE]:
+            rssid = self.dbhelper.get_rss_movie_id(title=title, year=year, tmdbid=tmdbid)
+        else:
+            if not tmdbid:
+                meta_info = MetaInfo(title=title)
+                title = meta_info.get_name()
+                season = meta_info.get_season_string()
+                if season:
+                    year = None
+            else:
+                season = None
+            rssid = self.dbhelper.get_rss_tv_id(title=title, year=year, season=season, tmdbid=tmdbid)
+        if rssid:
+            # 已订阅
+            fav = "1"
+        elif MediaServer().check_item_exists(title=title, year=year, tmdbid=tmdbid):
+            # 已下载
+            fav = "2"
+        else:
+            # 未订阅、未下载
+            fav = "0"
+        return fav, rssid
 
 
 if __name__ == "__main__":
     """
     手工转移时，使用命名行调用
     """
+    Config().init_syspath()
+
     parser = argparse.ArgumentParser(description='文件转移工具')
     parser.add_argument('-m', '--mode', dest='mode', required=True,
                         help='转移模式：link copy softlink move rclone rclonecopy minio miniocopy')

@@ -95,13 +95,13 @@
                       <div class="font-weight-medium strong">
                         <a href="{{ Result.page_url }}" target="_blank">{{ Result.title }} </a>
                         {% if Result.uploadvolumefactor != 1.0 %}
-                          <span class="badge text-white bg-azure mb-1">{{ (Result.uploadvolumefactor * 100) | int }}%UL</span>
+                          <span class="badge text-white bg-azure">{{ (Result.uploadvolumefactor * 100) | int }}%UL</span>
                         {% endif %}
                         {% if Result.downloadvolumefactor != 1.0 %}
                           {% if Result.downloadvolumefactor == 0.0 %}
-                            <span class="badge text-white bg-lime mb-1">FREE</span>
+                            <span class="badge text-white bg-lime">FREE</span>
                           {% else %}
-                            <span class="badge text-white bg-blue mb-1">{{ (Result.downloadvolumefactor * 100) | int }}%DL</span>
+                            <span class="badge text-white bg-blue">{{ (Result.downloadvolumefactor * 100) | int }}%DL</span>
                           {% endif %}
                         {% endif %}
                         <a class="ms-2 mb-1" title="名称测试"
@@ -117,7 +117,7 @@
                         {% endif %}
                         {{ Result.description }}
                       </div>
-                      <custom-chips class="mt-3" id="testresults_{{ loop.index0 }}"></custom-chips>
+                      <custom-chips class="mt-1" id="testresults_{{ loop.index0 }}"></custom-chips>
                     </td>
                     <td class="sort-pubdate" data-pubdate="{{ Result.pubdate }}">{{ Result.date_elapsed }}</td>
                     <td class="sort-size" data-size="{{ Result.size }}">
@@ -176,27 +176,29 @@
   tableDataList = new List('site-resources-table', {
     sortClass: 'table-sort',
     listClass: 'table-tbody',
-    valueNames: ['sort-pubdate', 'sort-size', 'sort-seeders', 'sort-peers', 'sort-grabs']
+    valueNames: ['sort-seeders', 'sort-peers', 'sort-grabs',
+                {attr: 'data-size', name: 'sort-size'},
+                {attr: 'data-pubdate', name: 'sort-pubdate'}]
   });
 
   //跳转页
   function go_page(page) {
-    navmenu("resources?site={{ SiteId }}" + "&title={{ Title }}" + "&page=" + page + "&keyword=" + $("#search_word").val())
+    navmenu(`resources?site={{ SiteId }}&title={{ Title }}&page=${page}&keyword=${$("#search_word").val()}`)
   }
 
   // 上一页
   function go_pre_page(page) {
-    navmenu("resources?site={{ SiteId }}" + "&title={{ Title }}" + "&page=" + (page - 1) + "&keyword=" + $("#search_word").val())
+    navmenu(`resources?site={{ SiteId }}&title={{ Title }}&page=${page - 1}&keyword=${$("#search_word").val()}`)
   }
 
   // 下一页
   function go_next_page(page) {
-    navmenu("resources?site={{ SiteId }}" + "&title={{ Title }}" + "&page=" + (page + 1) + "&keyword=" + $("#search_word").val())
+    navmenu(`resources?site={{ SiteId }}&title={{ Title }}&page=${page + 1}&keyword=${$("#search_word").val()}`)
   }
 
   //下载按钮
   function download_site_resource(id, name) {
-    show_download_modal(id, name, function(){
+    show_download_modal(id, name, "{{ Title }}", function(){
       $("#modal-search-download").modal('hide');
       download_resource(id, false);
     })
@@ -208,14 +210,14 @@
 
   function download_resource(id, batch) {
     const site = "{{ Title }}";
-    const enclosure = $("#enclosure_" + id).val();
-    const title = $("#title_" + id).val();
-    const description = $("#description_" + id).val();
-    const page_url = $("#page_url_" + id).val();
-    const size = $("#size_" + id).val();
-    const seeders = $("#seeders_" + id).val();
-    const uploadvolumefactor = $("#uploadvolumefactor_" + id).val();
-    const downloadvolumefactor = $("#downloadvolumefactor_" + id).val();
+    const enclosure = $(`#enclosure_${id}`).val();
+    const title = $(`#title_${id}`).val();
+    const description = $(`#description_${id}`).val();
+    const page_url = $(`#page_url_${id}`).val();
+    const size = $(`#size_${id}`).val();
+    const seeders = $(`#seeders_${id}`).val();
+    const uploadvolumefactor = $(`#uploadvolumefactor_${id}`).val();
+    const downloadvolumefactor = $(`#downloadvolumefactor_${id}`).val();
     if (!batch || current_download === 0) {
     }
     const params = {

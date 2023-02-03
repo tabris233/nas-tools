@@ -202,17 +202,19 @@ function select_GetHiddenVAL(name) {
  * 获取元素下input设置
  * @param: id 元素id
  **/
-function input_GetInputVal(id) {
+function input_select_GetVal(id, prefix=null) {
     let params = {};
     $(`#${id} input`).each(function () {
-        let value;
-        const key = $(this).attr("id");
-        if ($(this).attr("type") === "checkbox") {
-            value = !!$(this).prop("checked");
-        } else {
-            value = $(this).val();
+        let key = $(this).attr("id");
+        if (key) {
+            params[(prefix) ? key.replace(prefix, "") : key] = ($(this).attr("type") === "checkbox") ? !!$(this).prop("checked") : $(this).val();
         }
-        params[key] = value;
+    });
+    $(`#${id} select`).each(function () {
+        let key = $(this).attr("id");
+        if (key) {
+            params[(prefix) ? key.replace(prefix, "") : key] = $(this).val();
+        }
     });
     return params;
 }
@@ -277,9 +279,13 @@ function sleep(ms) {
 /**
  * 比较版本号大小，v1大于v2时返回1，相等返回0，否则返回-1
  */
-function compareVersion(v1, v2) {
-    v1 = v1.split('-')[0].split('.');
-    v2 = v2.split('-')[0].split('.');
+function compareVersion(version1, version2) {
+    version1 = version1.split(' ');
+    version2 = version2.split(' ');
+    const c1= version1[1];
+    const c2= version2[1];
+    const v1 = version1[0].replace('v', '').split('.');
+    const v2 = version2[0].replace('v', '').split('.');
     const len = Math.max(v1.length, v2.length);
 
     while (v1.length < len) {
@@ -299,6 +305,14 @@ function compareVersion(v1, v2) {
             return -1;
         }
     }
-
-    return 0;
+    
+    if (c1 && c2) {
+        if (c1 === c2) {
+            return 0;
+        } else {
+            return 2;
+        }
+    } else {
+        return 0;
+    }
 }
