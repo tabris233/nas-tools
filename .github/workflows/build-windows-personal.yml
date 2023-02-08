@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - master-personal
+      - master_personal
     paths:
       - version.py
       - .github/workflows/build-windows-personal.yml
